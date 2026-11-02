@@ -1,0 +1,205 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "C/01_led_blink: Configure",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "-S",
+        "C/01_led_blink",
+        "-B",
+        "C/01_led_blink/build/nucleo_f446re",
+        "-G",
+        "Ninja",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/platform/arm-gcc.cmake",
+        "-DCMAKE_BUILD_TYPE=Debug"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "C/01_led_blink: Build",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "--build",
+        "C/01_led_blink/build/nucleo_f446re"
+      ],
+      "dependsOn": "C/01_led_blink: Configure",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "C/01_led_blink: Rebuild",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "--build",
+        "C/01_led_blink/build/nucleo_f446re",
+        "--clean-first"
+      ],
+      "dependsOn": "C/01_led_blink: Configure",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Rust/01_hello_world: Configure",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "-S",
+        "Rust/01_hello_world",
+        "-B",
+        "Rust/01_hello_world/build/nucleo_f446re",
+        "-G",
+        "Ninja",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/platform/arm-gcc.cmake",
+        "-DCMAKE_BUILD_TYPE=Debug"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Rust/01_hello_world: Build",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "--build",
+        "Rust/01_hello_world/build/nucleo_f446re"
+      ],
+      "dependsOn": "Rust/01_hello_world: Configure",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Rust/01_hello_world: Rebuild",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "--build",
+        "Rust/01_hello_world/build/nucleo_f446re",
+        "--clean-first"
+      ],
+      "dependsOn": "Rust/01_hello_world: Configure",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Rust/01_hello_world: Cargo check",
+      "type": "process",
+      "command": "/Users/hangyeonghyeon/.cargo/bin/cargo",
+      "args": [
+        "check",
+        "--manifest-path",
+        "Rust/01_hello_world/Cargo.toml",
+        "--target",
+        "thumbv7em-none-eabihf",
+        "--target-dir",
+        "Rust/01_hello_world/build/nucleo_f446re/rust/target",
+        "--locked",
+        "--offline"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$rustc"
+      ]
+    },
+    {
+      "label": "Rust/02_led_blink: Configure",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "-S",
+        "Rust/02_led_blink",
+        "-B",
+        "Rust/02_led_blink/build/nucleo_f446re",
+        "-G",
+        "Ninja",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/platform/arm-gcc.cmake",
+        "-DCMAKE_BUILD_TYPE=Debug"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Rust/02_led_blink: Build",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "--build",
+        "Rust/02_led_blink/build/nucleo_f446re"
+      ],
+      "dependsOn": "Rust/02_led_blink: Configure",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Rust/02_led_blink: Rebuild",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "--build",
+        "Rust/02_led_blink/build/nucleo_f446re",
+        "--clean-first"
+      ],
+      "dependsOn": "Rust/02_led_blink: Configure",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Rust/02_led_blink: Cargo check",
+      "type": "process",
+      "command": "/Users/hangyeonghyeon/.cargo/bin/cargo",
+      "args": [
+        "check",
+        "--manifest-path",
+        "Rust/02_led_blink/Cargo.toml",
+        "--target",
+        "thumbv7em-none-eabihf",
+        "--target-dir",
+        "Rust/02_led_blink/build/nucleo_f446re/rust/target",
+        "--locked",
+        "--offline"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$rustc"
+      ]
+    }
+  ]
+}

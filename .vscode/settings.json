@@ -1,0 +1,40 @@
+{
+  "cmake.configureOnOpen": false,
+  "cmake.sourceDirectory": "${workspaceFolder}/C/01_led_blink",
+  "cmake.buildDirectory": "${workspaceFolder}/C/01_led_blink/build/nucleo_f446re",
+  "cmake.configureSettings": {
+    "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/platform/arm-gcc.cmake",
+    "CMAKE_BUILD_TYPE": "Debug"
+  },
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "clangd.path": "/opt/homebrew/opt/llvm/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--compile-commands-dir=${workspaceFolder}/C/01_led_blink/build/nucleo_f446re",
+    "--query-driver=/Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc"
+  ],
+  "rust-analyzer.linkedProjects": [
+    "Rust/01_hello_world/Cargo.toml",
+    "Rust/02_led_blink/Cargo.toml"
+  ],
+  "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
+  "rust-analyzer.cargo.allTargets": false,
+  "rust-analyzer.check.allTargets": false,
+  "rust-analyzer.cargo.extraArgs": [
+    "--offline",
+    "--locked"
+  ],
+  "rust-analyzer.check.extraArgs": [
+    "--offline",
+    "--locked"
+  ],
+  "rust-analyzer.cargo.targetDir": "build/rust-analyzer",
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/external/**": true
+  },
+  "search.exclude": {
+    "**/build": true,
+    "external": true
+  }
+}

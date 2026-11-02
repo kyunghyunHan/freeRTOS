@@ -1,0 +1,23 @@
+{
+  "FreeRTOS-Kernel": {
+    "repository": "https://github.com/FreeRTOS/FreeRTOS-Kernel",
+    "tag": "V11.2.0",
+    "commit": "0adc196d4bd52a2d91102b525b0aafc1e14a2386",
+    "archive_ref": "0adc196d4bd52a2d91102b525b0aafc1e14a2386",
+    "sha256": "6af5d78e39a5237b63faaafdc31672c87b27b68e713e2a57d3528aa3a4c1cee8"
+  },
+  "cmsis-device-f4": {
+    "repository": "https://github.com/STMicroelectronics/cmsis-device-f4",
+    "tag": "v2.6.10",
+    "commit": "5f41fb29d22773896c780052bf61e47fc924d524",
+    "archive_ref": "5f41fb29d22773896c780052bf61e47fc924d524",
+    "sha256": "7b70f5e3613eac5472426b206765620aa4192d96df1f21a3a5d84ea999f70c41"
+  },
+  "CMSIS_5": {
+    "repository": "https://github.com/ARM-software/CMSIS_5",
+    "tag": "5.9.0",
+    "commit": "2b7495b8535bdcb306dac29b9ded4cfb679d7e5c",
+    "archive_ref": "5.9.0",
+    "sha256": "9ce693dd15c41f02506adda79323c077912b3211303ca0d9b28b8ebe735a7031"
+  }
+}

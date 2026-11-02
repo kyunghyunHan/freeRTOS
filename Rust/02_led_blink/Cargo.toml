@@ -1,0 +1,15 @@
+[package]
+name = "rustapp"
+version = "0.1.0"
+edition = "2024"
+[lib]
+crate-type = ["staticlib"]
+[dependencies]
+freertos-board = { path = "../../platform/rust-api" }
+[profile.dev]
+panic = "abort"
+opt-level = "s"
+[profile.release]
+panic = "abort"
+opt-level = "s"
+debug = true

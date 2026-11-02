@@ -1,0 +1,8 @@
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_SYSTEM_PROCESSOR arm)
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+set(ARM_TOOLCHAIN_BIN "/Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin" CACHE PATH "Existing ARM GCC directory")
+set(CMAKE_C_COMPILER "${ARM_TOOLCHAIN_BIN}/arm-zephyr-eabi-gcc")
+set(CMAKE_ASM_COMPILER "${CMAKE_C_COMPILER}")
+set(CMAKE_OBJCOPY "${ARM_TOOLCHAIN_BIN}/arm-zephyr-eabi-objcopy")
+set(CMAKE_SIZE "${ARM_TOOLCHAIN_BIN}/arm-zephyr-eabi-size")
