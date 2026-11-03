@@ -42,3 +42,17 @@ cmake --build Rust/02_led_blink/build/nucleo_f446re
 | [예제 추가](docs/development.md) | C/Rust 앱 추가 |
 | [문제 해결](docs/troubleshooting.md) | 빌드·연결 오류 |
 | [검증 결과](docs/verification.md) | 빌드 결과와 미검증 항목 |
+
+
+- [ARM 프로그래밍 실무 — FreeRTOS](https://wikidocs.net/160931)
+  - RTOS 기본 개념
+  - FreeRTOS Task
+  - CMSIS-RTOS
+  - STM32에서의 RTOS 활용
+
+- [리눅스로 공부하는 운영체제](https://wikidocs.net/book/9819)
+  - 프로세스와 스레드
+  - CPU 스케줄링
+  - 프로세스 동기화, Race Condition, Critical Section
+  - 메모리 관리, 인터럽트, DMA, 디바이스 드라이버
+  - RTOS 학습 전 운영체제 기초 추천
