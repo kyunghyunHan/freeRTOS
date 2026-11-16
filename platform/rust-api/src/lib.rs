@@ -4,6 +4,7 @@ use core::panic::PanicInfo;
 unsafe extern "C" {
     fn rtos_delay_ms(ms: u32);
     fn rtos_led_toggle();
+    fn rtos_button_pressed() -> u32;
     fn rtos_uart_write(data: *const u8, len: usize);
     fn rtos_panic() -> !;
 }
@@ -30,6 +31,12 @@ impl BoardTask {
     pub fn toggle_led(&mut self) {
         // SAFETY: This token exclusively owns PA5 and requires mutable access.
         unsafe { rtos_led_toggle() }
+    }
+    /// Reads B1 USER (PC13). Debouncing belongs to the application task.
+    pub fn button_pressed(&mut self) -> bool {
+        // SAFETY: board_init configured PC13 before this task claimed the token.
+        // The C function only reads the GPIO input register and returns 0 or 1.
+        unsafe { rtos_button_pressed() != 0 }
     }
     pub fn write(&mut self, message: &str) {
         // SAFETY: The slice is readable for len bytes throughout this synchronous

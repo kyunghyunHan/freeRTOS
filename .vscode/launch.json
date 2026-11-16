@@ -36,6 +36,30 @@
       "miDebuggerServerAddress": "localhost:3333",
       "launchCompleteCommand": "None",
       "externalConsole": false
+    },
+    {
+      "name": "C/02_gpio_button (OpenOCD 3333 \ud544\uc694, load \uc5c6\uc74c)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/C/02_gpio_button/build/nucleo_f446re/firmware.elf",
+      "cwd": "${workspaceFolder}",
+      "MIMode": "gdb",
+      "miDebuggerPath": "/Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+      "miDebuggerServerAddress": "localhost:3333",
+      "launchCompleteCommand": "None",
+      "externalConsole": false
+    },
+    {
+      "name": "Rust/02_gpio_button (OpenOCD 3333 \ud544\uc694, load \uc5c6\uc74c)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/Rust/02_gpio_button/build/nucleo_f446re/firmware.elf",
+      "cwd": "${workspaceFolder}",
+      "MIMode": "gdb",
+      "miDebuggerPath": "/Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+      "miDebuggerServerAddress": "localhost:3333",
+      "launchCompleteCommand": "None",
+      "externalConsole": false
     }
   ]
 }

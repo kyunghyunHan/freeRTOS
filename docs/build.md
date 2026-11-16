@@ -17,6 +17,20 @@ cmake -S Rust/02_led_blink -B Rust/02_led_blink/build/nucleo_f446re -G Ninja \
 cmake --build Rust/02_led_blink/build/nucleo_f446re
 ```
 
+## 02 GPIO 버튼 예제
+
+C/Rust 버전의 최초 설정과 보드 확인 절차는 [C 02](../C/02_gpio_button/README.md),
+[Rust 02](../Rust/02_gpio_button/README.md)를 참고하세요.
+
+```bash
+cmake -S C/02_gpio_button -B C/02_gpio_button/build/nucleo_f446re -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build C/02_gpio_button/build/nucleo_f446re
+cmake -S Rust/02_gpio_button -B Rust/02_gpio_button/build/nucleo_f446re -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build Rust/02_gpio_button/build/nucleo_f446re
+```
+
 ## 코드 수정 후 빌드
 
 ```bash
@@ -75,7 +89,7 @@ CMake 캐시를 바꿀 때는 `cmake --fresh -S ... -B ...`에 최초의 toolcha
 
 ## Cargo 직접 실행
 
-두 앱은 로컬 path 의존성 하나뿐이고 crates.io에 접근하지 않습니다.
+Rust 앱은 로컬 path 의존성 하나뿐이고 crates.io에 접근하지 않습니다.
 Cargo만 실행하면 정적 라이브러리까지 생성하며 보드용 최종 ELF는 CMake 링크가 필요합니다.
 
 ```bash
@@ -92,7 +106,7 @@ CMake `Release`로 바꿔도 Cargo는 자동으로 `--release`로 바뀌지 않�
 
 ## 결과 파일
 
-세 앱 모두 `앱/build/nucleo_f446re/`에 다음 파일을 생성합니다.
+모든 앱은 `앱/build/nucleo_f446re/`에 다음 파일을 생성합니다.
 
 | 파일 | 용도 |
 |---|---|

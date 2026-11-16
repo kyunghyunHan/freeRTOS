@@ -12,8 +12,12 @@ void board_init(void)
     SystemCoreClockUpdate();
     SCB->VTOR = FLASH_BASE;
     NVIC_SetPriorityGrouping(0); /* Four preemption priority bits, no subpriority. */
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOCEN;
     (void)RCC->AHB1ENR;
+    /* B1 USER connects PC13 to ground when pressed (MB1136 schematic).
+       Input mode with pull-up; no EXTI interrupt is needed for polling. */
+    GPIOC->MODER &= ~(3U << 26);
+    GPIOC->PUPDR = (GPIOC->PUPDR & ~(3U << 26)) | (1U << 26);
     GPIOA->BSRR = 1U << (5 + 16);
     GPIOA->MODER = (GPIOA->MODER & ~((3U << 10) | (3U << 4) | (3U << 6)))
                    | (1U << 10) | (2U << 4) | (2U << 6);
@@ -33,6 +37,11 @@ void board_led_toggle(void)
 {
     /* Sole application task owns PA5. BSRR makes the actual update atomic. */
     GPIOA->BSRR = (GPIOA->ODR & (1U << 5)) ? (1U << 21) : (1U << 5);
+}
+
+uint32_t board_button_pressed(void)
+{
+    return (GPIOC->IDR & (1U << 13)) == 0U;
 }
 
 void board_uart_write(const uint8_t *data, size_t len)
