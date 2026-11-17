@@ -1,7 +1,8 @@
 # 의존성과 복원
 
 커널·CMSIS 버전은 `external/dependencies.lock.json`에 고정합니다.
-보드 초기화는 `register/platform/board.c`, 장치 헤더와 startup은 ST CMSIS를 사용합니다.
+초기화와 GPIO/UART 제어는 각 예제 소스의 레지스터 접근 코드에 있습니다.
+C 장치 헤더와 startup은 ST CMSIS를 사용합니다.
 
 | 폴더 | 공식 출처 | 태그 | commit |
 |---|---|---|---|
@@ -56,6 +57,6 @@ tar -xzf .cache/downloads/CMSIS_5.tar.gz -C external/CMSIS_5 --strip-components=
 커널은 MIT, CMSIS_5는 Apache-2.0, ST 장치 패키지는 저장소 LICENSE.md와 파일별 고지를 따릅니다.
 재배포할 때 원본 라이선스 파일을 함께 보존하세요.
 
-Rust는 외부 crate가 없으며 `register/platform/rust-api` path 의존성만 사용합니다.
-두 앱의 Cargo.lock을 추적하고 `--locked --offline`으로 빌드합니다.
+Rust는 로컬·외부 의존성 crate 없이 `core`만 사용합니다.
+세 앱의 Cargo.lock을 추적하고 `--locked --offline`으로 빌드합니다.
 도구 버전·SDK 출처와 Rust 정확 버전 선택은 [설치 문서](setup.md)에 있습니다.

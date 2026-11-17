@@ -35,6 +35,24 @@ Rust 포맷 검사와 기존 세 예제의 재빌드도 확인했습니다.
 
 ## 2026-11-17 register / hal 폴더 분리
 
-기존 C/Rust 예제와 platform을 `register/`로 이동했습니다. `hal/`은 구현 예정입니다.
+기존 C/Rust 예제를 `register/`로 이동했습니다. `hal/`은 구현 예정입니다.
 새 경로에서 다섯 예제를 `cmake --fresh`로 구성하고 ELF/HEX/BIN 빌드를 확인했습니다.
 VS Code JSON 구문과 문서의 로컬 링크도 확인했습니다. 보드 기록은 실행하지 않았습니다.
+
+## 2026-11-17 예제 소스에서 직접 레지스터 접근
+
+보드 추상화와 Rust 보드 API를 제거했습니다. C는 각 `src/main.c`에서 CMSIS 레지스터를,
+Rust는 각 `src/lib.rs`에서 실제 주소에 volatile 읽기/쓰기를 사용합니다.
+FreeRTOS 설정·링커·오류 hook은 예제별로 포함하고, 컴파일·링크 설정만 `cmake/`에 둡니다.
+
+| 예제 | ELF/HEX/BIN | Flash 크기 | 정적 RAM | MSP 예약 |
+|---|---|---:|---:|---:|
+| register/C/01_led_blink | 빌드 성공 | 7388 B | 33096 B | 4096 B |
+| register/C/02_gpio_button | 빌드 성공 | 7524 B | 33096 B | 4096 B |
+| register/Rust/01_hello_world | 빌드 성공 | 7564 B | 33096 B | 4096 B |
+| register/Rust/02_led_blink | 빌드 성공 | 7612 B | 33096 B | 4096 B |
+| register/Rust/02_gpio_button | 빌드 성공 | 7596 B | 33096 B | 4096 B |
+
+다섯 예제를 새로 구성한 뒤 빌드했고, Rust 포맷을 정리했습니다.
+최종 ELF의 커널 인터럽트 핸들러 및 기존 보드 함수 심볼 제거,
+VS Code JSON과 로컬 문서 링크를 확인했습니다. 보드 동작은 미검증입니다.

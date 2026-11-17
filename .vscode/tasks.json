@@ -12,7 +12,7 @@
         "register/C/01_led_blink/build/nucleo_f446re",
         "-G",
         "Ninja",
-        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/register/platform/arm-gcc.cmake",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-gcc.cmake",
         "-DCMAKE_BUILD_TYPE=Debug"
       ],
       "options": {
@@ -64,7 +64,7 @@
         "register/Rust/01_hello_world/build/nucleo_f446re",
         "-G",
         "Ninja",
-        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/register/platform/arm-gcc.cmake",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-gcc.cmake",
         "-DCMAKE_BUILD_TYPE=Debug"
       ],
       "options": {
@@ -138,7 +138,7 @@
         "register/Rust/02_led_blink/build/nucleo_f446re",
         "-G",
         "Ninja",
-        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/register/platform/arm-gcc.cmake",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-gcc.cmake",
         "-DCMAKE_BUILD_TYPE=Debug"
       ],
       "options": {
@@ -212,7 +212,7 @@
         "register/C/02_gpio_button/build/nucleo_f446re",
         "-G",
         "Ninja",
-        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/register/platform/arm-gcc.cmake",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-gcc.cmake",
         "-DCMAKE_BUILD_TYPE=Debug"
       ],
       "options": {
@@ -264,7 +264,7 @@
         "register/Rust/02_gpio_button/build/nucleo_f446re",
         "-G",
         "Ninja",
-        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/register/platform/arm-gcc.cmake",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-gcc.cmake",
         "-DCMAKE_BUILD_TYPE=Debug"
       ],
       "options": {

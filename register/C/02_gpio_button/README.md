@@ -10,7 +10,8 @@ NUCLEO-F446RE 내장 B1 USER 버튼 하나로 LD2 LED를 토글합니다. 추가
 - 리셋할 때 누르고 있으면 디바운스 후 한 번 토글합니다. 매우 짧은 누름은 무시될 수 있습니다.
 
 버튼 회로 기준: [ST MB1136 회로도, MCU 페이지](https://www.st.com/resource/en/schematic_pack/mb1136-default-c04_schematic.pdf).
-GPIO 레지스터 접근은 공통 `register/platform/board.c`에 있으며, C/Rust 앱에 같은 디바운스 로직을 구현했습니다.
+GPIO 레지스터는 각 예제 소스에서 직접 접근합니다. C는 `src/main.c`의 CMSIS 레지스터 정의를,
+Rust는 `src/lib.rs`의 실제 주소와 volatile 읽기/쓰기를 사용합니다. 디바운스 로직도 각 예제에 있습니다.
 
 ## 빌드
 
@@ -18,7 +19,7 @@ GPIO 레지스터 접근은 공통 `register/platform/board.c`에 있으며, C/R
 
 ```bash
 cmake -S register/C/02_gpio_button -B register/C/02_gpio_button/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
 cmake --build register/C/02_gpio_button/build/nucleo_f446re
 ```
 

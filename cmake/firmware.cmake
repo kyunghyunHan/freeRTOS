@@ -1,4 +1,4 @@
-get_filename_component(FREERTOS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+get_filename_component(FREERTOS_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_EXECUTABLE_SUFFIX .elf)
 set(KERNEL "${FREERTOS_ROOT}/external/FreeRTOS-Kernel")
@@ -9,26 +9,27 @@ foreach(required "${KERNEL}/tasks.c" "${DEVICE}/Include/stm32f446xx.h" "${CORE}/
     message(FATAL_ERROR "Dependency missing: ${required}. See docs/dependencies.md")
   endif()
 endforeach()
-add_library(platform STATIC
-  "${FREERTOS_ROOT}/register/platform/board.c"
-  "${FREERTOS_ROOT}/register/platform/hooks.c"
-  "${FREERTOS_ROOT}/register/platform/runtime.c"
+# Only build wiring is shared. Every example owns its startup configuration,
+# linker script, hooks, and peripheral register accesses.
+add_library(freertos_kernel STATIC
   "${DEVICE}/Source/Templates/system_stm32f4xx.c"
   "${KERNEL}/tasks.c" "${KERNEL}/queue.c" "${KERNEL}/list.c"
   "${KERNEL}/portable/GCC/ARM_CM4F/port.c"
   "${KERNEL}/portable/MemMang/heap_4.c")
-target_include_directories(platform PUBLIC "${FREERTOS_ROOT}/register/platform" "${KERNEL}/include"
+target_include_directories(freertos_kernel PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${KERNEL}/include"
   "${KERNEL}/portable/GCC/ARM_CM4F" "${DEVICE}/Include" "${CORE}")
-target_compile_definitions(platform PUBLIC STM32F446xx HSI_VALUE=16000000U)
-target_compile_options(platform PUBLIC -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
+target_compile_definitions(freertos_kernel PUBLIC STM32F446xx HSI_VALUE=16000000U)
+target_compile_options(freertos_kernel PUBLIC -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
   -ffunction-sections -fdata-sections -fno-common -Wall -Wextra -g3)
-target_compile_options(platform PRIVATE -Werror)
-add_executable(firmware "${DEVICE}/Source/Templates/gcc/startup_stm32f446xx.s")
-target_link_libraries(firmware PRIVATE platform)
+target_compile_options(freertos_kernel PRIVATE -Werror)
+add_executable(firmware "${DEVICE}/Source/Templates/gcc/startup_stm32f446xx.s"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/hooks.c")
+target_compile_options(firmware PRIVATE -Werror)
+target_link_libraries(firmware PRIVATE freertos_kernel)
 target_link_options(firmware PRIVATE -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
-  -nostartfiles "-T${FREERTOS_ROOT}/register/platform/stm32f446re.ld"
+  -nostartfiles "-T${CMAKE_CURRENT_SOURCE_DIR}/stm32f446re.ld"
   -Wl,--gc-sections -Wl,-z,noexecstack -Wl,--print-memory-usage "-Wl,-Map=${CMAKE_BINARY_DIR}/firmware.map")
-set_property(TARGET firmware APPEND PROPERTY LINK_DEPENDS "${FREERTOS_ROOT}/register/platform/stm32f446re.ld")
+set_property(TARGET firmware APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/stm32f446re.ld")
 add_custom_command(TARGET firmware POST_BUILD
   COMMAND "${CMAKE_OBJCOPY}" -O ihex $<TARGET_FILE:firmware> "${CMAKE_BINARY_DIR}/firmware.hex"
   COMMAND "${CMAKE_OBJCOPY}" -O binary $<TARGET_FILE:firmware> "${CMAKE_BINARY_DIR}/firmware.bin"
@@ -53,7 +54,6 @@ function(add_rust_application)
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" VERBATIM USES_TERMINAL)
   # Always ask Cargo to check freshness, including path dependencies and deleted outputs.
   add_dependencies(firmware rust_application)
-  target_sources(firmware PRIVATE "${FREERTOS_ROOT}/register/platform/rust_entry.c"
-    "${FREERTOS_ROOT}/register/platform/rust_bridge.c")
-  target_link_libraries(firmware PRIVATE "${rust_archive}" platform)
+  target_sources(firmware PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.c")
+  target_link_libraries(firmware PRIVATE "${rust_archive}" freertos_kernel)
 endfunction()

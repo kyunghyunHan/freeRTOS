@@ -7,15 +7,17 @@ CMake와 Ninja로 빌드하며, Rust 예제는 Cargo로 만든 정적 라이브�
 freeRTOS/
 ├── register/              # 레지스터 직접 제어 버전
 │   ├── C/                # LED, 버튼 예제 + 03~07 예약 폴더
-│   ├── Rust/             # UART 로그, LED, 버튼 예제
-│   └── platform/         # 레지스터 보드 코드/FreeRTOS 설정/C ABI/Rust API
+│   └── Rust/             # UART 로그, LED, 버튼 예제
 ├── hal/                   # HAL 버전용 예약 폴더 (아직 미구현)
+├── cmake/                 # 컴파일·링크 설정만 공유
 ├── external/              # 공식 의존성, dependencies.lock.json
 ├── docs/
 └── .vscode/
 ```
 
-현재 구현은 모두 `register/`에 있습니다. Rust도 C ABI를 통해 레지스터 보드 코드를 호출합니다.
+현재 구현은 모두 `register/`에 있습니다. C는 CMSIS 레지스터 정의로 직접 접근하고,
+Rust는 실제 레지스터 주소에 `read_volatile` / `write_volatile`을 사용합니다.
+각 예제는 `FreeRTOSConfig.h`, 링커 스크립트, 오류 hook을 자체 포함합니다.
 `hal/`의 구분과 구현 상태는 [HAL 안내](hal/README.md)를 참고하세요.
 
 소스는 각 앱의 `src/`, 빌드 결과는 `build/nucleo_f446re/`에 있습니다.

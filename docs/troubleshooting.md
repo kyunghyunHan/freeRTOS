@@ -3,7 +3,7 @@
 | 증상 | 해결 |
 |---|---|
 | dependency missing | [의존성 복원](dependencies.md) 후 재구성 |
-| libc.a 또는 string.h 없음 | register/platform/arm-gcc.cmake의 SDK 경로 확인 |
+| libc.a 또는 string.h 없음 | cmake/arm-gcc.cmake의 SDK 경로 확인 |
 | CMake 경로·컴파일러 오류 | 해당 앱 build를 지우고 toolchain 옵션과 함께 재구성 |
 | missing core | rustup target list --installed에서 thumbv7em-none-eabihf 확인 |
 | uses VFP register arguments | C hard-float / Rust eabihf 일치 여부 확인 후 clean |

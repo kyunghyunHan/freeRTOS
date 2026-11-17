@@ -1,7 +1,6 @@
 #include "stm32f4xx.h"
 #include "FreeRTOS.h"
 #include "task.h"
-#include "board.h"
 
 /* 1=allocation, 2=stack overflow, 3=assert, 4=HardFault,
    5=Rust panic, 6=scheduler returned, 7=task creation. */
@@ -13,7 +12,7 @@ volatile struct {
     const char *task_name;
 } g_diagnostic;
 
-_Noreturn void platform_fail(uint32_t reason)
+_Noreturn void firmware_fail(uint32_t reason)
 {
     __disable_irq();
     g_diagnostic.reason = reason;
@@ -26,19 +25,23 @@ _Noreturn void platform_fail(uint32_t reason)
     for (;;) { __NOP(); }
 }
 
-void platform_assert(const char *file, int line)
+void firmware_assert(const char *file, int line)
 {
     __disable_irq();
     g_diagnostic.file = file;
     g_diagnostic.line = line;
-    platform_fail(3);
+    firmware_fail(3);
 }
-void vApplicationMallocFailedHook(void) { platform_fail(1); }
+void vApplicationMallocFailedHook(void) { firmware_fail(1); }
 void vApplicationStackOverflowHook(TaskHandle_t task, char *name)
 {
     __disable_irq();
     g_diagnostic.task = task;
     g_diagnostic.task_name = name;
-    platform_fail(2);
+    firmware_fail(2);
 }
-void HardFault_Handler(void) { platform_fail(4); }
+void HardFault_Handler(void) { firmware_fail(4); }
+
+/* ST startup calls the C library constructor runner. */
+void _init(void) {}
+void _fini(void) {}

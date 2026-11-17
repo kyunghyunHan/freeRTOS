@@ -2,7 +2,7 @@
 #define FREERTOS_CONFIG_H
 #include <stdint.h>
 extern uint32_t SystemCoreClock;
-void platform_assert(const char *file, int line);
+void firmware_assert(const char *file, int line);
 #define configUSE_PREEMPTION 1
 #define configUSE_TIME_SLICING 1
 #define configCPU_CLOCK_HZ SystemCoreClock
@@ -35,7 +35,7 @@ void platform_assert(const char *file, int line);
 #define INCLUDE_vTaskDelete 1
 #define INCLUDE_uxTaskGetStackHighWaterMark 1
 #define INCLUDE_xTaskGetSchedulerState 1
-#define configASSERT(x) do { if (!(x)) platform_assert(__FILE__, __LINE__); } while (0)
+#define configASSERT(x) do { if (!(x)) firmware_assert(__FILE__, __LINE__); } while (0)
 #define vPortSVCHandler SVC_Handler
 #define xPortPendSVHandler PendSV_Handler
 #define xPortSysTickHandler SysTick_Handler

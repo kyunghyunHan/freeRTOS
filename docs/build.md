@@ -2,7 +2,7 @@
 
 모든 명령은 프로젝트 루트에서 실행합니다. 현재 빌드 대상은 `register/`의 예제입니다.
 
-폴더 분리 전에 생성한 빌드 캐시에는 이전 절대 경로가 남습니다. 기존 빌드 폴더는
+폴더 분리 또는 빌드 구조 변경 전에 생성한 빌드 캐시에는 이전 경로가 남습니다. 기존 빌드 폴더는
 그대로 재사용하지 말고, 아래 최초 설정 명령에 `--fresh`를 추가해 다시 구성하세요.
 
 ## 최초 설정
@@ -10,13 +10,13 @@
 ```bash
 cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
 cmake -S register/C/01_led_blink -B register/C/01_led_blink/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
 cmake --build register/C/01_led_blink/build/nucleo_f446re
 cmake -S register/Rust/01_hello_world -B register/Rust/01_hello_world/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
 cmake --build register/Rust/01_hello_world/build/nucleo_f446re
 cmake -S register/Rust/02_led_blink -B register/Rust/02_led_blink/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
 cmake --build register/Rust/02_led_blink/build/nucleo_f446re
 ```
 
@@ -27,10 +27,10 @@ C/Rust 버전의 최초 설정과 보드 확인 절차는 [C 02](../register/C/0
 
 ```bash
 cmake -S register/C/02_gpio_button -B register/C/02_gpio_button/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
 cmake --build register/C/02_gpio_button/build/nucleo_f446re
 cmake -S register/Rust/02_gpio_button -B register/Rust/02_gpio_button/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
 cmake --build register/Rust/02_gpio_button/build/nucleo_f446re
 ```
 
@@ -92,7 +92,7 @@ CMake 캐시를 바꿀 때는 `cmake --fresh -S ... -B ...`에 최초의 toolcha
 
 ## Cargo 직접 실행
 
-Rust 앱은 로컬 path 의존성 하나뿐이고 crates.io에 접근하지 않습니다.
+Rust 앱은 의존성 crate 없이 `core`만 사용하며 crates.io에 접근하지 않습니다.
 Cargo만 실행하면 정적 라이브러리까지 생성하며 보드용 최종 ELF는 CMake 링크가 필요합니다.
 
 ```bash

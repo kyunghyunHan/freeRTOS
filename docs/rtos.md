@@ -6,7 +6,7 @@ FreeRTOS는 실행 가능한 태스크 중 우선순위가 높은 태스크에 C
 
 ST 공식 startup의 벡터 첫 항목은 MSP 초기값 0x20020000이고 Reset_Handler가 SystemInit을 호출합니다.
 .data를 Flash에서 RAM으로 복사하고 .bss를 0으로 지운 뒤 C library init와 main을 호출합니다.
-SystemInit은 FPU를 활성화합니다. 공통 board_init은 내부 HSI 16MHz와 AHB/APB prescaler /1을 명시합니다.
+SystemInit은 FPU를 활성화합니다. 각 예제의 C main은 내부 HSI 16MHz와 AHB/APB prescaler /1을 명시합니다.
 보드의 외부 크리스털·ST-LINK MCO에 의존하지 않습니다. PLL/180MHz 구성은 사용하지 않습니다.
 STM32F446RE의 Flash 512KiB, SRAM 128KiB 전체를 링커에 선언하며 마지막 4KiB는 MSP 전용 영역으로 예약합니다.
 .data/.bss가 124KiB RAM 영역을 넘으면 링크 오류가 납니다.
@@ -16,7 +16,7 @@ PA13/PA14 SWD는 사용하지 않습니다. GPIO toggle은 단일 소유 태스�
 여러 작성자가 동시에 toggle하면 읽기/갱신 조합은 원자적이지 않으므로 소유권 또는 잠금이 필요합니다.
 
 C main은 xTaskCreate로 태스크를 만든 뒤 vTaskStartScheduler를 호출합니다.
-Rust도 동일한 C main과 커널을 사용하고 태스크 진입점 안에서 rust_task를 호출합니다.
+Rust 예제도 자체 C main에서 같은 커널을 시작하고 태스크 진입점 안에서 rust_task를 호출합니다.
 
 ## 스케줄러와 tick
 
@@ -65,9 +65,9 @@ ISR에서는 vTaskDelay/일반 mutex 대기 API를 호출할 수 없습니다. �
 | 항목 | 기존 Zephyr | 이 FreeRTOS 실습 |
 |---|---|---|
 | 관리 | west manifest/workspace | external lock + 직접 CMake |
-| 보드 설정 | Devicetree/Kconfig | CMSIS + board.c + FreeRTOSConfig.h |
-| 시작/링커 | 보드 빌드가 자동 구성 | ST startup + 공통 명시적 linker |
-| 드라이버 | 커널과 통합된 장치 API | 직접 레지스터 초기화, 필요 시 HAL 추가 |
+| 보드 설정 | Devicetree/Kconfig | 직접 레지스터 접근 + 예제별 FreeRTOSConfig.h |
+| 시작/링커 | 보드 빌드가 자동 구성 | ST startup + 예제별 명시적 linker |
+| 드라이버 | 커널과 통합된 장치 API | 예제 소스에서 직접 레지스터 초기화 |
 | 태스크 | 기본 main thread + k_thread | C main이 xTaskCreate/scheduler 시작 |
 | 지연 | k_msleep | vTaskDelay |
 | Rust | Zephyr 공식 모듈/CMake integration | 작은 로컬 C ABI + Rust staticlib |

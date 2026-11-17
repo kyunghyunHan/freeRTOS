@@ -3,7 +3,7 @@
   "cmake.sourceDirectory": "${workspaceFolder}/register/C/01_led_blink",
   "cmake.buildDirectory": "${workspaceFolder}/register/C/01_led_blink/build/nucleo_f446re",
   "cmake.configureSettings": {
-    "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/register/platform/arm-gcc.cmake",
+    "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/cmake/arm-gcc.cmake",
     "CMAKE_BUILD_TYPE": "Debug"
   },
   "C_Cpp.intelliSenseEngine": "disabled",
