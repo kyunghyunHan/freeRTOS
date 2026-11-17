@@ -3,7 +3,7 @@
 use core::panic::PanicInfo;
 use core::ptr::{read_volatile, write_volatile};
 
-// STM32F446 memory map. Each constant names the actual 32-bit register.
+// STM32F446 레지스터 주소
 const RCC_AHB1ENR: *mut u32 = 0x4002_3830 as *mut u32;
 const GPIOA_MODER: *mut u32 = 0x4002_0000 as *mut u32;
 const GPIOA_OTYPER: *mut u32 = 0x4002_0004 as *mut u32;
@@ -18,27 +18,25 @@ const USART2_CR2: *mut u32 = 0x4000_4410 as *mut u32;
 const USART2_CR3: *mut u32 = 0x4000_4414 as *mut u32;
 
 unsafe extern "C" {
-    // FreeRTOSConfig.h selects 32-bit ticks at 1000 Hz: one tick = one ms.
+    // FreeRTOS 지연: 32비트 tick, 1tick = 1ms
     fn vTaskDelay(ticks: u32);
     fn firmware_fail(reason: u32) -> !;
 }
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    // SAFETY: Disables interrupts, records reason 5, and never returns/unwinds.
+    // panic 오류 기록 후 정지
     unsafe { firmware_fail(5) }
 }
 
-// SAFETY: C creates exactly one application task and calls this entry once.
+// C에서 한 번 시작하는 태스크
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_task() -> ! {
-    // SAFETY: These aligned addresses are STM32F446 peripheral registers.
-    // This task exclusively owns the GPIO/UART; no peripheral ISR accesses them.
-    // C main has selected HSI 16 MHz, APB /1 before starting the scheduler.
+    // HSI 16MHz에서 단일 태스크가 레지스터 직접 제어
     unsafe {
         write_volatile(RCC_AHB1ENR, read_volatile(RCC_AHB1ENR) | 1);
-        let _ = read_volatile(RCC_AHB1ENR); // Clock-enable readback.
-        // PA2/PA3: AF7, USART2 TX/RX, RX pull-up; 115200 baud at 16 MHz.
+        let _ = read_volatile(RCC_AHB1ENR); // 클록 활성화 확인
+        // PA2/PA3 USART2 설정: 115200 baud
         write_volatile(
             GPIOA_MODER,
             (read_volatile(GPIOA_MODER) & !((3 << 4) | (3 << 6))) | (2 << 4) | (2 << 6),

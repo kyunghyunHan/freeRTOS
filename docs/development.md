@@ -13,7 +13,6 @@ cp -n register/C/01_led_blink/CMakeLists.txt register/C/08_my_task/
 cp -n register/C/01_led_blink/FreeRTOSConfig.h register/C/08_my_task/
 cp -n register/C/01_led_blink/stm32f446re.ld register/C/08_my_task/
 cp -n register/C/01_led_blink/src/main.c register/C/08_my_task/src/
-cp -n register/C/01_led_blink/src/hooks.c register/C/08_my_task/src/
 ```
 
 CMake project 이름과 `src/main.c`를 수정합니다.
@@ -38,7 +37,6 @@ cp -n register/Rust/01_hello_world/Cargo.lock register/Rust/03_my_task/
 cp -n register/Rust/01_hello_world/FreeRTOSConfig.h register/Rust/03_my_task/
 cp -n register/Rust/01_hello_world/stm32f446re.ld register/Rust/03_my_task/
 cp -n register/Rust/01_hello_world/src/main.c register/Rust/03_my_task/src/
-cp -n register/Rust/01_hello_world/src/hooks.c register/Rust/03_my_task/src/
 cp -n register/Rust/01_hello_world/src/lib.rs register/Rust/03_my_task/src/
 ```
 

@@ -7,9 +7,8 @@ GPIO/UART 초기화와 제어는 `src/lib.rs`에서 실제 레지스터 주소�
 
 | 파일 | 역할 |
 |---|---|
-| 각 예제의 src/main.c | HSI 16MHz, NVIC 설정, 태스크 생성, 스케줄러 시작 |
+| 각 예제의 src/main.c | HSI 16MHz, 태스크·스케줄러 시작, 오류 처리 |
 | 각 예제의 src/lib.rs | 레지스터 주소 상수, volatile 읽기/쓰기, 태스크 로직, panic_handler |
-| 각 예제의 src/hooks.c | FreeRTOS 오류 hook, fault 진단, C 런타임 시작 함수 |
 | 각 예제의 FreeRTOSConfig.h | 1kHz tick, 32bit TickType_t, heap/인터럽트 설정 |
 | 각 예제의 stm32f446re.ld | Flash/RAM/MSP 메모리 배치 |
 | cmake/firmware.cmake | C 커널 빌드, Cargo 실행, 최종 ELF 링크 |
@@ -48,5 +47,5 @@ Rust는 커널의 `vTaskDelay(u32)`를 직접 호출합니다. 이 선언은 각
 Rust는 동적 할당을 사용하지 않습니다. 지역 변수는 FreeRTOS 태스크 스택에,
 문자열 상수는 Flash에 놓입니다. C의 heap_4는 태스크와 TCB를 할당합니다.
 
-각 앱의 panic_handler는 자체 `src/hooks.c`의 `firmware_fail(5)`를 호출합니다.
+각 앱의 panic_handler는 자체 `src/main.c`의 `firmware_fail(5)`를 호출합니다.
 인터럽트를 끄고 진단 정보를 저장한 채 정지하며 C 경계로 unwind하지 않습니다.

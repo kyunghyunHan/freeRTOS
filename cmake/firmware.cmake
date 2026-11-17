@@ -22,8 +22,7 @@ target_compile_definitions(freertos_kernel PUBLIC STM32F446xx HSI_VALUE=16000000
 target_compile_options(freertos_kernel PUBLIC -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
   -ffunction-sections -fdata-sections -fno-common -Wall -Wextra -g3)
 target_compile_options(freertos_kernel PRIVATE -Werror)
-add_executable(firmware "${DEVICE}/Source/Templates/gcc/startup_stm32f446xx.s"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/hooks.c")
+add_executable(firmware "${DEVICE}/Source/Templates/gcc/startup_stm32f446xx.s")
 target_compile_options(firmware PRIVATE -Werror)
 target_link_libraries(firmware PRIVATE freertos_kernel)
 target_link_options(firmware PRIVATE -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
