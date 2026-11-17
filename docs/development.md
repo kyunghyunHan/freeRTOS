@@ -5,9 +5,9 @@
 ## C
 
 ```bash
-mkdir -p C/08_my_task/src
-cp -n C/01_led_blink/CMakeLists.txt C/08_my_task/CMakeLists.txt
-cp -n C/01_led_blink/src/main.c C/08_my_task/src/main.c
+mkdir -p register/C/08_my_task/src
+cp -n register/C/01_led_blink/CMakeLists.txt register/C/08_my_task/CMakeLists.txt
+cp -n register/C/01_led_blink/src/main.c register/C/08_my_task/src/main.c
 ```
 
 CMake의 project 이름과 태스크 소스를 수정합니다. `include(../../platform/firmware.cmake)`는 유지하고
@@ -15,9 +15,9 @@ CMake의 project 이름과 태스크 소스를 수정합니다. `include(../../p
 새 앱도 main에서 board_init 후 태스크 생성 결과를 검사하고 scheduler를 시작해야 합니다.
 
 ```bash
-cmake -S C/08_my_task -B C/08_my_task/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build C/08_my_task/build/nucleo_f446re
+cmake -S register/C/08_my_task -B register/C/08_my_task/build/nucleo_f446re -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/C/08_my_task/build/nucleo_f446re
 ```
 
 02~07 예약 폴더도 같은 최소 파일을 추가하면 됩니다. 현재 README만 있고 빌드 대상은 아닙니다.
@@ -27,20 +27,20 @@ cmake --build C/08_my_task/build/nucleo_f446re
 빌드 산출물을 복사하지 않고 필요한 소스만 가져옵니다.
 
 ```bash
-mkdir -p Rust/03_my_task/src
-cp -n Rust/01_hello_world/CMakeLists.txt Rust/03_my_task/CMakeLists.txt
-cp -n Rust/01_hello_world/Cargo.toml Rust/03_my_task/Cargo.toml
-cp -n Rust/01_hello_world/Cargo.lock Rust/03_my_task/Cargo.lock
-cp -n Rust/01_hello_world/src/lib.rs Rust/03_my_task/src/lib.rs
+mkdir -p register/Rust/03_my_task/src
+cp -n register/Rust/01_hello_world/CMakeLists.txt register/Rust/03_my_task/CMakeLists.txt
+cp -n register/Rust/01_hello_world/Cargo.toml register/Rust/03_my_task/Cargo.toml
+cp -n register/Rust/01_hello_world/Cargo.lock register/Rust/03_my_task/Cargo.lock
+cp -n register/Rust/01_hello_world/src/lib.rs register/Rust/03_my_task/src/lib.rs
 ```
 
 CMake project 이름을 수정하고 staticlib 이름 rustapp은 유지합니다.
 메시지/앱 로직을 수정한 뒤 빌드합니다.
 
 ```bash
-cmake -S Rust/03_my_task -B Rust/03_my_task/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build Rust/03_my_task/build/nucleo_f446re
+cmake -S register/Rust/03_my_task -B register/Rust/03_my_task/build/nucleo_f446re -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/Rust/03_my_task/build/nucleo_f446re
 ```
 
 새 API는 rust_bridge.h/.c와 rust-api/src/lib.rs 양쪽의 ABI 및 안전 계약을 함께 추가합니다.

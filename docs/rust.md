@@ -6,10 +6,10 @@ C가 보드와 FreeRTOS를 초기화하고, FreeRTOS 태스크에서 `no_std` Ru
 
 | 파일 | 역할 |
 |---|---|
-| platform/rust_entry.c | 태스크 생성, 스케줄러 시작, rust_task 호출 |
-| platform/rust_bridge.h / .c | delay, LED, UART, panic의 C ABI |
-| platform/rust-api/src/lib.rs | Rust API와 panic_handler |
-| Rust/*/src/lib.rs | 예제 로직 |
+| register/platform/rust_entry.c | 태스크 생성, 스케줄러 시작, rust_task 호출 |
+| register/platform/rust_bridge.h / .c | delay, LED, UART, panic의 C ABI |
+| register/platform/rust-api/src/lib.rs | Rust API와 panic_handler |
+| register/Rust/*/src/lib.rs | 예제 로직 |
 
 커뮤니티 바인딩인 [FreeRTOS-rust](https://github.com/lobaro/FreeRTOS-rust)는
 C 커널 빌드와 Rust allocator 연결을 제공합니다. 2026-11-02 조회 기준 최근 commit은

@@ -4,9 +4,9 @@
 
 | 예제 | ELF/HEX/BIN | Flash 크기 | 정적 RAM | MSP 예약 |
 |---|---|---:|---:|---:|
-| C/01_led_blink | 빌드 성공 | 7488 B | 33096 B | 4096 B |
-| Rust/01_hello_world | 빌드 성공 | 8856 B | 33096 B | 4096 B |
-| Rust/02_led_blink | 빌드 성공 | 8932 B | 33096 B | 4096 B |
+| register/C/01_led_blink | 빌드 성공 | 7488 B | 33096 B | 4096 B |
+| register/Rust/01_hello_world | 빌드 성공 | 8856 B | 33096 B | 4096 B |
+| register/Rust/02_led_blink | 빌드 성공 | 8932 B | 33096 B | 4096 B |
 
 정적 RAM에는 heap_4의 32KiB가 포함됩니다.
 
@@ -27,8 +27,14 @@
 
 | 예제 | ELF/HEX/BIN | Flash 크기 | 정적 RAM | MSP 예약 |
 |---|---|---:|---:|---:|
-| C/02_gpio_button | 빌드 성공 | 7624 B | 33096 B | 4096 B |
-| Rust/02_gpio_button | 빌드 성공 | 8912 B | 33096 B | 4096 B |
+| register/C/02_gpio_button | 빌드 성공 | 7624 B | 33096 B | 4096 B |
+| register/Rust/02_gpio_button | 빌드 성공 | 8912 B | 33096 B | 4096 B |
 
 Rust 포맷 검사와 기존 세 예제의 재빌드도 확인했습니다.
 실제 보드 기록, B1 입력 극성·디바운스·길게 누름·해제 후 재누름 동작은 보드에서 미검증입니다.
+
+## 2026-11-17 register / hal 폴더 분리
+
+기존 C/Rust 예제와 platform을 `register/`로 이동했습니다. `hal/`은 구현 예정입니다.
+새 경로에서 다섯 예제를 `cmake --fresh`로 구성하고 ELF/HEX/BIN 빌드를 확인했습니다.
+VS Code JSON 구문과 문서의 로컬 링크도 확인했습니다. 보드 기록은 실행하지 않았습니다.

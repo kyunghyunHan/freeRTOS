@@ -1,21 +1,22 @@
 {
   "cmake.configureOnOpen": false,
-  "cmake.sourceDirectory": "${workspaceFolder}/C/01_led_blink",
-  "cmake.buildDirectory": "${workspaceFolder}/C/01_led_blink/build/nucleo_f446re",
+  "cmake.sourceDirectory": "${workspaceFolder}/register/C/01_led_blink",
+  "cmake.buildDirectory": "${workspaceFolder}/register/C/01_led_blink/build/nucleo_f446re",
   "cmake.configureSettings": {
-    "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/platform/arm-gcc.cmake",
+    "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/register/platform/arm-gcc.cmake",
     "CMAKE_BUILD_TYPE": "Debug"
   },
   "C_Cpp.intelliSenseEngine": "disabled",
   "clangd.path": "/opt/homebrew/opt/llvm/bin/clangd",
   "clangd.arguments": [
     "--background-index",
-    "--compile-commands-dir=${workspaceFolder}/C/01_led_blink/build/nucleo_f446re",
+    "--compile-commands-dir=${workspaceFolder}/register/C/01_led_blink/build/nucleo_f446re",
     "--query-driver=/Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc"
   ],
   "rust-analyzer.linkedProjects": [
-    "Rust/01_hello_world/Cargo.toml",
-    "Rust/02_led_blink/Cargo.toml"
+    "register/Rust/01_hello_world/Cargo.toml",
+    "register/Rust/02_led_blink/Cargo.toml",
+    "register/Rust/02_gpio_button/Cargo.toml"
   ],
   "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
   "rust-analyzer.cargo.allTargets": false,

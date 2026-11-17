@@ -11,7 +11,7 @@ macOS Apple Silicon 기준입니다. 아래 도구가 설치되어 있습니다(
 | Rust / Cargo | 1.99.0 / 1.99.0 | ~/.cargo/bin |
 | clangd | — | /opt/homebrew/opt/llvm/bin/clangd |
 
-CMake의 `platform/arm-gcc.cmake`는 위 SDK 경로를 사용합니다.
+CMake의 `register/platform/arm-gcc.cmake`는 위 SDK 경로를 사용합니다.
 Homebrew ARM GCC 16.2.0에는 libc가 없어 SDK의 GCC와 picolibc를 사용합니다.
 SDK 설치 위치를 바꾸면 toolchain 파일과 `.vscode`의 GCC/GDB 경로도 수정하세요.
 `ARM_TOOLCHAIN_BIN`은 같은 `arm-zephyr-eabi` prefix를 쓰는 다른 bin 경로로 지정할 수 있습니다.
@@ -56,9 +56,9 @@ export RUSTUP_TOOLCHAIN=1.99.0
 `.vscode/extensions.json`에서 목록을 확인할 수 있습니다.
 
 Tasks의 Configure/Build/Rebuild로 빌드합니다.
-C 탐색은 `C/01_led_blink/build/nucleo_f446re/compile_commands.json`을 사용합니다.
+C 탐색은 `register/C/01_led_blink/build/nucleo_f446re/compile_commands.json`을 사용합니다.
 Rust 브리지 C 코드를 탐색하려면 settings의 clangd `--compile-commands-dir`을
-`Rust/02_led_blink/build/nucleo_f446re`로 바꾸고 clangd를 재시작합니다.
+`register/Rust/02_led_blink/build/nucleo_f446re`로 바꾸고 clangd를 재시작합니다.
 Rust Analyzer에는 두 앱과 `thumbv7em-none-eabihf` 타깃이 등록되어 있습니다.
 
 디버깅은 [OpenOCD 서버](flash-and-debug.md)를 먼저 실행한 뒤 launch 설정을 선택합니다.

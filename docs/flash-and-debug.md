@@ -16,7 +16,7 @@ cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
 /opt/homebrew/bin/openocd -s /opt/homebrew/share/openocd/scripts \
   -f board/st_nucleo_f4.cfg \
   -c 'reset_config srst_only srst_nogate connect_assert_srst' \
-  -c 'program C/01_led_blink/build/nucleo_f446re/firmware.elf verify reset exit'
+  -c 'program register/C/01_led_blink/build/nucleo_f446re/firmware.elf verify reset exit'
 ```
 
 Rust UART Hello World:
@@ -25,7 +25,7 @@ Rust UART Hello World:
 /opt/homebrew/bin/openocd -s /opt/homebrew/share/openocd/scripts \
   -f board/st_nucleo_f4.cfg \
   -c 'reset_config srst_only srst_nogate connect_assert_srst' \
-  -c 'program Rust/01_hello_world/build/nucleo_f446re/firmware.elf verify reset exit'
+  -c 'program register/Rust/01_hello_world/build/nucleo_f446re/firmware.elf verify reset exit'
 ```
 
 Rust LED Blink:
@@ -34,7 +34,7 @@ Rust LED Blink:
 /opt/homebrew/bin/openocd -s /opt/homebrew/share/openocd/scripts \
   -f board/st_nucleo_f4.cfg \
   -c 'reset_config srst_only srst_nogate connect_assert_srst' \
-  -c 'program Rust/02_led_blink/build/nucleo_f446re/firmware.elf verify reset exit'
+  -c 'program register/Rust/02_led_blink/build/nucleo_f446re/firmware.elf verify reset exit'
 ```
 
 HEX도 같은 program 명령에 사용할 수 있습니다. BIN은 주소가 없어 `program 파일.bin 0x08000000 verify reset exit`가 필요합니다.
@@ -84,7 +84,7 @@ Rust Blink는 시작 시 한 줄만 출력하므로 터미널 연결 뒤 NRST를
 
 ```bash
 /Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb \
-  C/01_led_blink/build/nucleo_f446re/firmware.elf
+  register/C/01_led_blink/build/nucleo_f446re/firmware.elf
 ```
 
 GDB 안에서 실행:

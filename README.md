@@ -5,21 +5,22 @@ CMake와 Ninja로 빌드하며, Rust 예제는 Cargo로 만든 정적 라이브�
 
 ```text
 freeRTOS/
-├── C/01_led_blink/          # FreeRTOS 태스크: LD2 PA5, 매 1000ms 토글
-├── C/02_gpio_button/       # B1 버튼으로 LD2 토글, 30ms 디바운스
-├── C/03_uart/ ~ 07_queue/  # README 예약 폴더
-├── Rust/01_hello_world/    # FreeRTOS 태스크에서 USART2 로그
-├── Rust/02_led_blink/      # 같은 커널 위 Rust 태스크: LED + 시작 로그
-├── Rust/02_gpio_button/    # C 02와 같은 GPIO 버튼 예제
-├── platform/              # 공통 보드/설정/링커/C ABI/Rust API
-├── external/              # 고정 공식 소스, dependencies.lock.json
+├── register/              # 레지스터 직접 제어 버전
+│   ├── C/                # LED, 버튼 예제 + 03~07 예약 폴더
+│   ├── Rust/             # UART 로그, LED, 버튼 예제
+│   └── platform/         # 레지스터 보드 코드/FreeRTOS 설정/C ABI/Rust API
+├── hal/                   # HAL 버전용 예약 폴더 (아직 미구현)
+├── external/              # 공식 의존성, dependencies.lock.json
 ├── docs/
 └── .vscode/
 ```
 
+현재 구현은 모두 `register/`에 있습니다. Rust도 C ABI를 통해 레지스터 보드 코드를 호출합니다.
+`hal/`의 구분과 구현 상태는 [HAL 안내](hal/README.md)를 참고하세요.
+
 소스는 각 앱의 `src/`, 빌드 결과는 `build/nucleo_f446re/`에 있습니다.
 C 03~07은 구현 전 폴더입니다.
-버튼 예제: [C 02](C/02_gpio_button/README.md), [Rust 02](Rust/02_gpio_button/README.md).
+버튼 예제: [C 02](register/C/02_gpio_button/README.md), [Rust 02](register/Rust/02_gpio_button/README.md).
 
 ## 빌드
 
@@ -27,11 +28,11 @@ C 03~07은 구현 전 폴더입니다.
 
 ```bash
 cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
-cmake --build C/01_led_blink/build/nucleo_f446re
-cmake --build C/02_gpio_button/build/nucleo_f446re
-cmake --build Rust/01_hello_world/build/nucleo_f446re
-cmake --build Rust/02_led_blink/build/nucleo_f446re
-cmake --build Rust/02_gpio_button/build/nucleo_f446re
+cmake --build register/C/01_led_blink/build/nucleo_f446re
+cmake --build register/C/02_gpio_button/build/nucleo_f446re
+cmake --build register/Rust/01_hello_world/build/nucleo_f446re
+cmake --build register/Rust/02_led_blink/build/nucleo_f446re
+cmake --build register/Rust/02_gpio_button/build/nucleo_f446re
 ```
 
 다섯 예제의 ELF/HEX/BIN 빌드는 확인했습니다. 보드 기록과 LED/UART 동작은 미검증입니다.

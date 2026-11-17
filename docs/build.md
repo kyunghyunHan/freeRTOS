@@ -1,51 +1,54 @@
 # 빌드와 clean
 
-모든 명령은 프로젝트 루트에서 실행합니다.
+모든 명령은 프로젝트 루트에서 실행합니다. 현재 빌드 대상은 `register/`의 예제입니다.
+
+폴더 분리 전에 생성한 빌드 캐시에는 이전 절대 경로가 남습니다. 기존 빌드 폴더는
+그대로 재사용하지 말고, 아래 최초 설정 명령에 `--fresh`를 추가해 다시 구성하세요.
 
 ## 최초 설정
 
 ```bash
 cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
-cmake -S C/01_led_blink -B C/01_led_blink/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build C/01_led_blink/build/nucleo_f446re
-cmake -S Rust/01_hello_world -B Rust/01_hello_world/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build Rust/01_hello_world/build/nucleo_f446re
-cmake -S Rust/02_led_blink -B Rust/02_led_blink/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build Rust/02_led_blink/build/nucleo_f446re
+cmake -S register/C/01_led_blink -B register/C/01_led_blink/build/nucleo_f446re -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/C/01_led_blink/build/nucleo_f446re
+cmake -S register/Rust/01_hello_world -B register/Rust/01_hello_world/build/nucleo_f446re -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/Rust/01_hello_world/build/nucleo_f446re
+cmake -S register/Rust/02_led_blink -B register/Rust/02_led_blink/build/nucleo_f446re -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/Rust/02_led_blink/build/nucleo_f446re
 ```
 
 ## 02 GPIO 버튼 예제
 
-C/Rust 버전의 최초 설정과 보드 확인 절차는 [C 02](../C/02_gpio_button/README.md),
-[Rust 02](../Rust/02_gpio_button/README.md)를 참고하세요.
+C/Rust 버전의 최초 설정과 보드 확인 절차는 [C 02](../register/C/02_gpio_button/README.md),
+[Rust 02](../register/Rust/02_gpio_button/README.md)를 참고하세요.
 
 ```bash
-cmake -S C/02_gpio_button -B C/02_gpio_button/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build C/02_gpio_button/build/nucleo_f446re
-cmake -S Rust/02_gpio_button -B Rust/02_gpio_button/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build Rust/02_gpio_button/build/nucleo_f446re
+cmake -S register/C/02_gpio_button -B register/C/02_gpio_button/build/nucleo_f446re -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/C/02_gpio_button/build/nucleo_f446re
+cmake -S register/Rust/02_gpio_button -B register/Rust/02_gpio_button/build/nucleo_f446re -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/register/platform/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/Rust/02_gpio_button/build/nucleo_f446re
 ```
 
 ## 코드 수정 후 빌드
 
 ```bash
 cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
-cmake --build C/01_led_blink/build/nucleo_f446re
-cmake --build Rust/01_hello_world/build/nucleo_f446re
-cmake --build Rust/02_led_blink/build/nucleo_f446re
+cmake --build register/C/01_led_blink/build/nucleo_f446re
+cmake --build register/Rust/01_hello_world/build/nucleo_f446re
+cmake --build register/Rust/02_led_blink/build/nucleo_f446re
 ```
 
 Ninja를 직접 실행해도 같습니다.
 
 ```bash
-ninja -C C/01_led_blink/build/nucleo_f446re
-ninja -C Rust/01_hello_world/build/nucleo_f446re
-ninja -C Rust/02_led_blink/build/nucleo_f446re
+ninja -C register/C/01_led_blink/build/nucleo_f446re
+ninja -C register/Rust/01_hello_world/build/nucleo_f446re
+ninja -C register/Rust/02_led_blink/build/nucleo_f446re
 ```
 
 ## 전체 재빌드
@@ -53,16 +56,16 @@ ninja -C Rust/02_led_blink/build/nucleo_f446re
 C:
 
 ```bash
-cmake --build C/01_led_blink/build/nucleo_f446re --clean-first
+cmake --build register/C/01_led_blink/build/nucleo_f446re --clean-first
 ```
 
 Rust는 Cargo 캐시도 비웁니다.
 
 ```bash
-cargo clean --manifest-path Rust/01_hello_world/Cargo.toml --target-dir Rust/01_hello_world/build/nucleo_f446re/rust/target
-cmake --build Rust/01_hello_world/build/nucleo_f446re --clean-first
-cargo clean --manifest-path Rust/02_led_blink/Cargo.toml --target-dir Rust/02_led_blink/build/nucleo_f446re/rust/target
-cmake --build Rust/02_led_blink/build/nucleo_f446re --clean-first
+cargo clean --manifest-path register/Rust/01_hello_world/Cargo.toml --target-dir register/Rust/01_hello_world/build/nucleo_f446re/rust/target
+cmake --build register/Rust/01_hello_world/build/nucleo_f446re --clean-first
+cargo clean --manifest-path register/Rust/02_led_blink/Cargo.toml --target-dir register/Rust/02_led_blink/build/nucleo_f446re/rust/target
+cmake --build register/Rust/02_led_blink/build/nucleo_f446re --clean-first
 ```
 
 ## clean
@@ -70,18 +73,18 @@ cmake --build Rust/02_led_blink/build/nucleo_f446re --clean-first
 소스와 CMake 캐시를 유지하고 빌드 결과만 지웁니다.
 
 ```bash
-cmake --build C/01_led_blink/build/nucleo_f446re --target clean
-cmake --build Rust/01_hello_world/build/nucleo_f446re --target clean
-cargo clean --manifest-path Rust/01_hello_world/Cargo.toml --target-dir Rust/01_hello_world/build/nucleo_f446re/rust/target
-cmake --build Rust/02_led_blink/build/nucleo_f446re --target clean
-cargo clean --manifest-path Rust/02_led_blink/Cargo.toml --target-dir Rust/02_led_blink/build/nucleo_f446re/rust/target
+cmake --build register/C/01_led_blink/build/nucleo_f446re --target clean
+cmake --build register/Rust/01_hello_world/build/nucleo_f446re --target clean
+cargo clean --manifest-path register/Rust/01_hello_world/Cargo.toml --target-dir register/Rust/01_hello_world/build/nucleo_f446re/rust/target
+cmake --build register/Rust/02_led_blink/build/nucleo_f446re --target clean
+cargo clean --manifest-path register/Rust/02_led_blink/Cargo.toml --target-dir register/Rust/02_led_blink/build/nucleo_f446re/rust/target
 ```
 
 구성부터 다시 시작할 때는 대상 앱의 빌드 폴더만 삭제합니다.
 C 빌드 폴더를 삭제한 뒤 위의 최초 설정 명령을 다시 실행합니다.
 
 ```bash
-rm -rf C/01_led_blink/build/nucleo_f446re
+rm -rf register/C/01_led_blink/build/nucleo_f446re
 ```
 
 `--clean-first`는 Cargo 캐시를 지우지 않으므로 Rust 전체 재빌드에는 `cargo clean`도 필요합니다.
@@ -93,12 +96,12 @@ Rust 앱은 로컬 path 의존성 하나뿐이고 crates.io에 접근하지 않�
 Cargo만 실행하면 정적 라이브러리까지 생성하며 보드용 최종 ELF는 CMake 링크가 필요합니다.
 
 ```bash
-cargo build --manifest-path Rust/01_hello_world/Cargo.toml --target thumbv7em-none-eabihf \
-  --target-dir Rust/01_hello_world/build/nucleo_f446re/rust/target --locked --offline
-cargo build --manifest-path Rust/02_led_blink/Cargo.toml --target thumbv7em-none-eabihf \
-  --target-dir Rust/02_led_blink/build/nucleo_f446re/rust/target --locked --offline
-cmake --build Rust/01_hello_world/build/nucleo_f446re
-cmake --build Rust/02_led_blink/build/nucleo_f446re
+cargo build --manifest-path register/Rust/01_hello_world/Cargo.toml --target thumbv7em-none-eabihf \
+  --target-dir register/Rust/01_hello_world/build/nucleo_f446re/rust/target --locked --offline
+cargo build --manifest-path register/Rust/02_led_blink/Cargo.toml --target thumbv7em-none-eabihf \
+  --target-dir register/Rust/02_led_blink/build/nucleo_f446re/rust/target --locked --offline
+cmake --build register/Rust/01_hello_world/build/nucleo_f446re
+cmake --build register/Rust/02_led_blink/build/nucleo_f446re
 ```
 
 CMake Debug, Rust dev profile(opt-level=s, debug info, panic=abort)를 사용합니다.

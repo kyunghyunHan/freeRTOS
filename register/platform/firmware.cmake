@@ -1,4 +1,4 @@
-get_filename_component(FREERTOS_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+get_filename_component(FREERTOS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_EXECUTABLE_SUFFIX .elf)
 set(KERNEL "${FREERTOS_ROOT}/external/FreeRTOS-Kernel")
@@ -10,14 +10,14 @@ foreach(required "${KERNEL}/tasks.c" "${DEVICE}/Include/stm32f446xx.h" "${CORE}/
   endif()
 endforeach()
 add_library(platform STATIC
-  "${FREERTOS_ROOT}/platform/board.c"
-  "${FREERTOS_ROOT}/platform/hooks.c"
-  "${FREERTOS_ROOT}/platform/runtime.c"
+  "${FREERTOS_ROOT}/register/platform/board.c"
+  "${FREERTOS_ROOT}/register/platform/hooks.c"
+  "${FREERTOS_ROOT}/register/platform/runtime.c"
   "${DEVICE}/Source/Templates/system_stm32f4xx.c"
   "${KERNEL}/tasks.c" "${KERNEL}/queue.c" "${KERNEL}/list.c"
   "${KERNEL}/portable/GCC/ARM_CM4F/port.c"
   "${KERNEL}/portable/MemMang/heap_4.c")
-target_include_directories(platform PUBLIC "${FREERTOS_ROOT}/platform" "${KERNEL}/include"
+target_include_directories(platform PUBLIC "${FREERTOS_ROOT}/register/platform" "${KERNEL}/include"
   "${KERNEL}/portable/GCC/ARM_CM4F" "${DEVICE}/Include" "${CORE}")
 target_compile_definitions(platform PUBLIC STM32F446xx HSI_VALUE=16000000U)
 target_compile_options(platform PUBLIC -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
@@ -26,9 +26,9 @@ target_compile_options(platform PRIVATE -Werror)
 add_executable(firmware "${DEVICE}/Source/Templates/gcc/startup_stm32f446xx.s")
 target_link_libraries(firmware PRIVATE platform)
 target_link_options(firmware PRIVATE -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
-  -nostartfiles "-T${FREERTOS_ROOT}/platform/stm32f446re.ld"
+  -nostartfiles "-T${FREERTOS_ROOT}/register/platform/stm32f446re.ld"
   -Wl,--gc-sections -Wl,-z,noexecstack -Wl,--print-memory-usage "-Wl,-Map=${CMAKE_BINARY_DIR}/firmware.map")
-set_property(TARGET firmware APPEND PROPERTY LINK_DEPENDS "${FREERTOS_ROOT}/platform/stm32f446re.ld")
+set_property(TARGET firmware APPEND PROPERTY LINK_DEPENDS "${FREERTOS_ROOT}/register/platform/stm32f446re.ld")
 add_custom_command(TARGET firmware POST_BUILD
   COMMAND "${CMAKE_OBJCOPY}" -O ihex $<TARGET_FILE:firmware> "${CMAKE_BINARY_DIR}/firmware.hex"
   COMMAND "${CMAKE_OBJCOPY}" -O binary $<TARGET_FILE:firmware> "${CMAKE_BINARY_DIR}/firmware.bin"
@@ -53,7 +53,7 @@ function(add_rust_application)
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" VERBATIM USES_TERMINAL)
   # Always ask Cargo to check freshness, including path dependencies and deleted outputs.
   add_dependencies(firmware rust_application)
-  target_sources(firmware PRIVATE "${FREERTOS_ROOT}/platform/rust_entry.c"
-    "${FREERTOS_ROOT}/platform/rust_bridge.c")
+  target_sources(firmware PRIVATE "${FREERTOS_ROOT}/register/platform/rust_entry.c"
+    "${FREERTOS_ROOT}/register/platform/rust_bridge.c")
   target_link_libraries(firmware PRIVATE "${rust_archive}" platform)
 endfunction()
