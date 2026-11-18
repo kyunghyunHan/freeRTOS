@@ -1,4 +1,3 @@
 cmake_minimum_required(VERSION 3.24)
-project(rust_02_gpio_button C ASM)
-include(../../../cmake/firmware.cmake)
-add_rust_application()
+project(gpio_button NONE)
+include(../../../cmake/cargo_firmware.cmake)
