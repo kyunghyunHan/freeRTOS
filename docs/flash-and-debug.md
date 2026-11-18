@@ -19,13 +19,13 @@ cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
   -c 'program register/C/build/01_led_blink/firmware.elf verify reset exit'
 ```
 
-Rust UART Hello World:
+Rust 01 — 현재 사용자 F429ZI LED·버튼 코드:
 
 ```bash
 /opt/homebrew/bin/openocd -s /opt/homebrew/share/openocd/scripts \
   -f board/st_nucleo_f4.cfg \
   -c 'reset_config srst_only srst_nogate connect_assert_srst' \
-  -c 'program register/Rust/01_hello_world/build/nucleo_f446re/firmware.elf verify reset exit'
+  -c 'program register/Rust/01_hello_world/target/thumbv7em-none-eabihf/release/firmware verify reset exit'
 ```
 
 Rust LED Blink:
@@ -34,7 +34,7 @@ Rust LED Blink:
 /opt/homebrew/bin/openocd -s /opt/homebrew/share/openocd/scripts \
   -f board/st_nucleo_f4.cfg \
   -c 'reset_config srst_only srst_nogate connect_assert_srst' \
-  -c 'program register/Rust/02_led_blink/build/nucleo_f446re/firmware.elf verify reset exit'
+  -c 'program register/Rust/02_led_blink/target/thumbv7em-none-eabihf/release/firmware verify reset exit'
 ```
 
 HEX도 같은 program 명령에 사용할 수 있습니다. BIN은 주소가 없어 `program 파일.bin 0x08000000 verify reset exit`가 필요합니다.
@@ -54,8 +54,10 @@ HEX도 같은 program 명령에 사용할 수 있습니다. BIN은 주소가 없
 
 ## UART
 
-USART2 TX=PA2, RX=PA3(AF7), 115200 baud, 8N1, 흐름제어 없음입니다.
-기본 보드 solder bridge의 ST-LINK VCP 연결(SB13/SB14 등)이 유지되어야 합니다.
+F429ZI의 Rust 02·03은 USART3 TX=PD8, RX=PD9(AF7), 115200 baud, 8N1, 흐름제어 없음입니다.
+Rust 01의 현재 사용자 LED·버튼 코드와 02_gpio_button은 UART 문자열을 출력하지 않습니다.
+F446RE 예제의 UART 핀은 USART2 PA2/PA3입니다.
+기본 보드의 ST-LINK VCP 연결을 유지해야 합니다.
 UART 출력은 Rust 태스크가 실행한 뒤 나오며, C LED 예제는 로그를 출력하지 않습니다.
 시리얼 장치 이름은 연결마다 달라집니다.
 
@@ -64,7 +66,7 @@ ls /dev/cu.usbmodem*
 screen /dev/cu.usbmodem실제장치이름 115200
 ```
 
-screen은 Ctrl-A, K, Y로 종료합니다. Hello World는 매초 재출력합니다.
+screen은 Ctrl-A, K, Y로 종료합니다. Cargo Hello World(03)는 매초 재출력합니다.
 Rust Blink는 시작 시 한 줄만 출력하므로 터미널 연결 뒤 NRST를 눌러 관측할 수 있습니다.
 현재 TX는 짧은 메시지용 polling입니다. 인터럽트는 켜져 있지만 UART 전송 중 현재 태스크가 TXE를 기다립니다.
 여러 태스크가 UART를 쓰면 mutex 또는 전용 로그 태스크가 필요합니다.
@@ -99,7 +101,7 @@ continue
 Rust는 `break rust_task`를 사용합니다. 오류로 정지했으면 Ctrl-C 후 다음을 확인하세요.
 
 ```gdb
-print g_diagnostic
+print g_freertos_diagnostic
 info registers
 backtrace
 ```

@@ -1,5 +1,45 @@
 # 검증 결과
 
+## 2026-11-18 F429ZI GPIO 버튼 예제 수정
+
+`02_gpio_button`도 Cargo 실행 파일로 변경해 `target/thumbv7em-none-eabihf/release/firmware`를 생성합니다.
+LED를 PA5에서 F429ZI LD1(PB0)으로, PC13 버튼 입력을 눌렀을 때 HIGH로 변경했습니다.
+입력은 pull-down이며 10ms 폴링과 30ms 디바운스 및 누를 때 한 번 토글하는 동작은 유지합니다.
+
+Cargo release·check·증분 빌드, CMake 호환 ELF/HEX/BIN 빌드,
+최종 ELF의 F429ZI 초기 스택·reset/fault/SVC/PendSV/SysTick 벡터·공통 런타임 초기화 배열·
+미해결 심볼 없음을 확인했습니다. VS Code 빌드/디버그 경로와 문서도 갱신했습니다.
+수정 Rust 포맷·JSON·diff 공백 검사는 통과했습니다. 실제 버튼·LED 동작은 보드에서 미검증입니다.
+
+## 2026-11-18 F429ZI의 01·02 Cargo 빌드 통일
+
+`01_hello_world`와 `02_led_blink`를 Cargo 실행 파일 타깃으로 변경했습니다.
+각 폴더에서 `cargo build --release --target thumbv7em-none-eabihf`로
+`target/thumbv7em-none-eabihf/release/firmware`를 생성합니다.
+사용자의 01 Rust 코드는 보존했고, 02는 F429ZI LD1(PB0)과 USART3(PD8/PD9)로 변경했습니다.
+공유 Cargo 빌드 코드를 03 Hello World에서도 재사용합니다.
+
+01·02·03 Cargo release 빌드, 01·02 cargo check와 증분 빌드,
+01·02 CMake 호환 ELF/HEX/BIN 생성, 01·02 최종 ELF의 F429ZI 스택·reset/fault/FreeRTOS 벡터·
+공통 초기화 배열·미해결 심볼 없음을 확인했습니다.
+VS Code task/debug 경로, JSON, 변경한 Rust 포맷과 diff 공백 검사도 확인했습니다.
+보드 기록과 LED/UART 실제 동작은 미검증입니다.
+
+## 2026-11-18 Rust 애플리케이션 진입점 정리
+
+Rust 예제 세 개의 `src/main.c`를 제거했습니다. LED·버튼 예제는 Rust `main()`과
+공유 `register/Rust/support/startup.rs`에서 태스크를 생성하고 스케줄러를 시작합니다.
+사용자가 수정한 `01_hello_world/src/lib.rs`는 보존했습니다.
+Cargo Hello World의 앱 C 런타임 파일도 제거했습니다.
+FreeRTOS 커널과 CMSIS·공통 오류/초기화 런타임은 계속 C/ASM을 사용합니다.
+
+Rust 세 예제(F429ZI 1개, F446RE 2개)의 ELF/HEX/BIN, Cargo Hello World release,
+기존 C 두 예제, `tests/verify_c_link.py` 세 fixture의 빌드를 확인했습니다.
+Rust 예제 세 개의 초기 스택·reset/fault/SVC/PendSV/SysTick 벡터·미해결 심볼 없음을 확인했습니다.
+수정한 Rust 코드의 포맷과 diff 공백 검사도 통과했습니다. 실제 보드 동작은 미검증입니다.
+
+아래는 이전 구성에서 기록한 검증 이력입니다.
+
 2026-11-03 / macOS Apple Silicon / NUCLEO-F446RE
 
 | 예제 | ELF/HEX/BIN | Flash 크기 | 정적 RAM | MSP 예약 |

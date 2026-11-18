@@ -4,14 +4,27 @@ set(CMAKE_EXECUTABLE_SUFFIX .elf)
 set(KERNEL "${FREERTOS_ROOT}/external/FreeRTOS-Kernel")
 set(DEVICE "${FREERTOS_ROOT}/external/cmsis-device-f4")
 set(CORE "${FREERTOS_ROOT}/external/CMSIS_5/CMSIS/Core/Include")
-foreach(required "${KERNEL}/tasks.c" "${DEVICE}/Include/stm32f446xx.h" "${CORE}/core_cm4.h")
+set(BOARD "nucleo_f446re" CACHE STRING "Target board: nucleo_f446re or nucleo_f429zi")
+set_property(CACHE BOARD PROPERTY STRINGS nucleo_f446re nucleo_f429zi)
+if(BOARD STREQUAL "nucleo_f446re")
+  set(device_name stm32f446xx)
+  set(device_definition STM32F446xx)
+  set(default_linker_script "${CMAKE_CURRENT_SOURCE_DIR}/stm32f446re.ld")
+elseif(BOARD STREQUAL "nucleo_f429zi")
+  set(device_name stm32f429xx)
+  set(device_definition STM32F429xx)
+  set(default_linker_script "${FREERTOS_ROOT}/cmake/stm32f429zi.ld")
+else()
+  message(FATAL_ERROR "Unsupported BOARD: ${BOARD}")
+endif()
+foreach(required "${KERNEL}/tasks.c" "${DEVICE}/Include/${device_name}.h" "${CORE}/core_cm4.h")
   if(NOT EXISTS "${required}")
     message(FATAL_ERROR "Dependency missing: ${required}. See docs/dependencies.md")
   endif()
 endforeach()
 # 공통 설정, 프로젝트별 재정의 가능
 set(FIRMWARE_CONFIG_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "FreeRTOSConfig.h directory")
-set(FIRMWARE_LINKER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/stm32f446re.ld" CACHE FILEPATH "Linker script")
+set(FIRMWARE_LINKER_SCRIPT "${default_linker_script}" CACHE FILEPATH "Linker script; use a separate build directory for each board")
 set(FIRMWARE_EXTRA_INCLUDE_DIRS "" CACHE STRING "Additional include directories")
 set(FIRMWARE_EXTRA_SOURCES "" CACHE STRING "Additional source files")
 set(FIRMWARE_EXTRA_DEFINITIONS "" CACHE STRING "Additional compile definitions")
@@ -28,7 +41,7 @@ add_library(freertos_kernel STATIC
 target_include_directories(freertos_kernel PUBLIC ${FIRMWARE_EXTRA_INCLUDE_DIRS}
   "${FIRMWARE_CONFIG_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}" "${KERNEL}/include"
   "${KERNEL}/portable/GCC/ARM_CM4F" "${DEVICE}/Include" "${CORE}")
-target_compile_definitions(freertos_kernel PUBLIC STM32F446xx HSI_VALUE=16000000U
+target_compile_definitions(freertos_kernel PUBLIC ${device_definition} HSI_VALUE=16000000U
   ${FIRMWARE_EXTRA_DEFINITIONS})
 target_compile_options(freertos_kernel PUBLIC -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
   -ffunction-sections -fdata-sections -fno-common -Wall -Wextra -g3)
@@ -36,7 +49,7 @@ target_compile_options(freertos_kernel PRIVATE -Werror)
 # 기본 HardFault가 startup의 weak 별칭보다 먼저 연결되도록 배치
 add_executable(firmware "${FREERTOS_ROOT}/cmake/freertos_hooks.c"
   "${FREERTOS_ROOT}/cmake/freertos_runtime.c"
-  "${DEVICE}/Source/Templates/gcc/startup_stm32f446xx.s" ${FIRMWARE_EXTRA_SOURCES})
+  "${DEVICE}/Source/Templates/gcc/startup_${device_name}.s" ${FIRMWARE_EXTRA_SOURCES})
 target_compile_options(firmware PRIVATE -Werror)
 target_link_libraries(firmware PRIVATE freertos_kernel)
 target_link_options(firmware PRIVATE -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
@@ -67,6 +80,5 @@ function(add_rust_application)
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" VERBATIM USES_TERMINAL)
   # Always ask Cargo to check freshness, including path dependencies and deleted outputs.
   add_dependencies(firmware rust_application)
-  target_sources(firmware PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.c")
   target_link_libraries(firmware PRIVATE "${rust_archive}" freertos_kernel)
 endfunction()

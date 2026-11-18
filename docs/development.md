@@ -18,23 +18,22 @@ C 공통 FreeRTOSConfig.h와 링커는 `cmake/`에 있습니다. Hook은 자동 
 
 ```bash
 mkdir -p register/Rust/03_my_task/src
-cp -n register/Rust/01_hello_world/CMakeLists.txt register/Rust/03_my_task/
-cp -n register/Rust/01_hello_world/Cargo.toml register/Rust/03_my_task/
-cp -n register/Rust/01_hello_world/Cargo.lock register/Rust/03_my_task/
-cp -n register/Rust/01_hello_world/FreeRTOSConfig.h register/Rust/03_my_task/
-cp -n register/Rust/01_hello_world/stm32f446re.ld register/Rust/03_my_task/
-cp -n register/Rust/01_hello_world/src/main.c register/Rust/03_my_task/src/
-cp -n register/Rust/01_hello_world/src/lib.rs register/Rust/03_my_task/src/
+cp -n register/Rust/02_led_blink/CMakeLists.txt register/Rust/03_my_task/
+cp -n register/Rust/02_led_blink/Cargo.toml register/Rust/03_my_task/
+cp -n register/Rust/02_led_blink/Cargo.lock register/Rust/03_my_task/
+cp -n register/Rust/02_led_blink/build.rs register/Rust/03_my_task/
+cp -n register/Rust/02_led_blink/FreeRTOSConfig.h register/Rust/03_my_task/
+cp -n register/Rust/02_led_blink/src/lib.rs register/Rust/03_my_task/src/
 ```
 
-CMake project 이름을 수정하고 staticlib 이름 rustapp은 유지합니다.
-`src/main.c`는 커널 시작을 담당하고, `src/lib.rs`가 주변장치 레지스터를 직접 다룹니다.
+필요하면 Cargo package와 CMake project 이름을 수정합니다. 실행 파일 이름 `firmware`는 유지합니다.
+`src/lib.rs`의 Rust `main()`이 시작점입니다. 공유 `../support/startup.rs`가 Rust에서
+태스크를 생성하고 스케줄러를 시작하며, GPIO 제어도 Rust 태스크가 담당합니다. 앱의 C 파일은 없습니다.
 의존성 crate는 없습니다. tick 설정을 바꾸면 Rust의 `vTaskDelay` ABI와 지연값도 맞춰야 합니다.
 
 ```bash
-cmake -S register/Rust/03_my_task -B register/Rust/03_my_task/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build register/Rust/03_my_task/build/nucleo_f446re
+cd register/Rust/03_my_task
+cargo build --release --target thumbv7em-none-eabihf
 ```
 
 여러 태스크가 같은 주변장치를 사용하면 레지스터 접근 경합을 직접 처리해야 합니다.

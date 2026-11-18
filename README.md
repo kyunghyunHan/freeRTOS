@@ -1,7 +1,7 @@
 # FreeRTOS C / Rust 실습 — NUCLEO-F446RE
 
 macOS Apple Silicon / STM32 NUCLEO-F446RE / 내장 ST-LINK.
-CMake와 Ninja로 빌드하며, Rust 예제는 Cargo로 만든 정적 라이브러리를 FreeRTOS와 연결합니다.
+C는 CMake와 Ninja, F429ZI용 Rust 예제는 Cargo로 최종 펌웨어를 빌드합니다.
 
 ```text
 freeRTOS/
@@ -18,7 +18,13 @@ freeRTOS/
 C 실습은 `register/C/01_led_blink.c`, `02_gpio_button.c`처럼 파일 하나로 작성합니다.
 새 `.c` 파일을 추가해도 CMakeLists.txt를 수정할 필요가 없습니다.
 FreeRTOS Hook은 자동 제공되며 GPIO는 예제에서 레지스터를 직접 다룹니다.
-Rust 예제와 [HAL 예약 폴더](hal/README.md)는 유지합니다.
+Rust 예제는 Rust `main()`에서 시작하며 태스크 생성과 GPIO/UART 제어도 Rust로 작성합니다.
+FreeRTOS 커널과 공통 CMSIS 런타임은 C/ASM으로 연결합니다.
+[HAL 예약 폴더](hal/README.md)는 유지합니다.
+
+NUCLEO-F429ZI의 01·02 빌드와 기록 명령은 [빌드 문서](docs/build.md)에 있습니다.
+문자열 Hello World 예제는
+[Cargo Hello World 예제](register/Rust/03_hello_world_cargo/README.md)를 참고하세요.
 
 ## C 빌드
 

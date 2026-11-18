@@ -3,32 +3,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-/*
- * STM32F446RE / STM32F429ZI
- *
- * FreeRTOS + Register
- * HAL GPIO 사용하지 않음
- *
- * [STM32F446RE - 주석 처리]
- * B1  : PC13
- * LD2 : PA5 (Green)
- *
- * [STM32F429ZI - 활성화]
- * B1  : PC13
- * LD2 : PB7 (Blue)
- *
- * 버튼 누름 → LED ON
- * 버튼 뗌   → LED OFF
- *
- * FreeRTOS Task에서 10ms마다 버튼 확인
- */
-
-/* =========================================
- * 1. RCC Register
- * ========================================= */
-
-#define RCC_BASE       0x40023800UL
-#define RCC_AHB1ENR    (*(volatile uint32_t *)(RCC_BASE + 0x30UL))
+#define RCC_BASE 0x40023800UL
+#define RCC_AHB1ENR (*(volatile uint32_t *)(RCC_BASE + 0x30UL))
 
 /* =========================================
  * 2. STM32F446RE - GPIOA (주석 처리)
@@ -44,34 +20,28 @@
 #define LED_PIN        5U
 */
 
-/* =========================================
- * 3. STM32F429ZI - GPIOB (활성화)
- * ========================================= */
 
-#define GPIOB_BASE     0x40020400UL
 
-#define GPIOB_MODER    (*(volatile uint32_t *)(GPIOB_BASE + 0x00UL))
-#define GPIOB_OTYPER   (*(volatile uint32_t *)(GPIOB_BASE + 0x04UL))
-#define GPIOB_PUPDR    (*(volatile uint32_t *)(GPIOB_BASE + 0x0CUL))
-#define GPIOB_BSRR     (*(volatile uint32_t *)(GPIOB_BASE + 0x18UL))
+#define GPIOB_BASE 0x40020400UL
 
-#define LED_PIN        7U
+#define GPIOB_MODER (*(volatile uint32_t *)(GPIOB_BASE + 0x00UL))
+#define GPIOB_OTYPER (*(volatile uint32_t *)(GPIOB_BASE + 0x04UL))
+#define GPIOB_PUPDR (*(volatile uint32_t *)(GPIOB_BASE + 0x0CUL))
+#define GPIOB_BSRR (*(volatile uint32_t *)(GPIOB_BASE + 0x18UL))
 
-/* =========================================
- * 4. GPIOC - USER Button (공통)
- * ========================================= */
+#define LED_PIN 7U
 
-#define GPIOC_BASE     0x40020800UL
 
-#define GPIOC_MODER    (*(volatile uint32_t *)(GPIOC_BASE + 0x00UL))
-#define GPIOC_PUPDR    (*(volatile uint32_t *)(GPIOC_BASE + 0x0CUL))
-#define GPIOC_IDR      (*(volatile uint32_t *)(GPIOC_BASE + 0x10UL))
 
-#define BUTTON_PIN     13U
+#define GPIOC_BASE 0x40020800UL
 
-/* =========================================
- * 5. GPIO Initialization
- * ========================================= */
+#define GPIOC_MODER (*(volatile uint32_t *)(GPIOC_BASE + 0x00UL))
+#define GPIOC_PUPDR (*(volatile uint32_t *)(GPIOC_BASE + 0x0CUL))
+#define GPIOC_IDR (*(volatile uint32_t *)(GPIOC_BASE + 0x10UL))
+
+#define BUTTON_PIN 13U
+
+
 
 static void GPIO_Init(void)
 {
@@ -108,7 +78,7 @@ static void GPIO_Init(void)
 
     // PB7 Output Mode (01)
     GPIOB_MODER &= ~(3UL << (LED_PIN * 2U));
-    GPIOB_MODER |=  (1UL << (LED_PIN * 2U));
+    GPIOB_MODER |= (1UL << (LED_PIN * 2U));
 
     // PB7 Push-Pull
     GPIOB_OTYPER &= ~(1UL << LED_PIN);
@@ -179,12 +149,12 @@ int main(void)
 
     /* FreeRTOS Task Creation */
     BaseType_t result = xTaskCreate(
-        Button_Task,
-        "Button_Task",
-        256,
-        NULL,
-        tskIDLE_PRIORITY + 1,
-        NULL
+        Button_Task,          // 실행할 Task 함수
+        "Button_Task",        // Task 이름
+        256,                  // Stack 크기
+        NULL,                 // Task 매개변수
+        tskIDLE_PRIORITY + 1, // Task 우선순위
+        NULL                  // Task Handle 반환받지 않음
     );
 
     if (result != pdPASS)

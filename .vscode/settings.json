@@ -1,5 +1,11 @@
 {
   "cmake.configureOnOpen": false,
+  "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.formatting": "clangFormat",
+  "C_Cpp.clang_format_path": "/opt/homebrew/opt/llvm/bin/clang-format",
+  "[c]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  },
   "cmake.sourceDirectory": "${workspaceFolder}/register/C",
   "cmake.buildDirectory": "${workspaceFolder}/register/C/build/01_led_blink",
   "cmake.configureSettings": {
@@ -7,7 +13,6 @@
     "CMAKE_BUILD_TYPE": "Debug",
     "APP": "01_led_blink"
   },
-  "C_Cpp.intelliSenseEngine": "disabled",
   "clangd.path": "/opt/homebrew/opt/llvm/bin/clangd",
   "clangd.arguments": [
     "--background-index",

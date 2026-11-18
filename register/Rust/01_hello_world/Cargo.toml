@@ -2,8 +2,12 @@
 name = "rustapp"
 version = "0.1.0"
 edition = "2024"
-[lib]
-crate-type = ["staticlib"]
+autolib = false
+[[bin]]
+name = "firmware"
+path = "src/lib.rs"
+test = false
+bench = false
 [profile.dev]
 panic = "abort"
 opt-level = "s"

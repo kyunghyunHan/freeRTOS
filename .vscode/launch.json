@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "register/C/01_led_blink (OpenOCD 3333 \ud544\uc694, load \uc5c6\uc74c)",
+      "name": "register/C/01_led_blink (OpenOCD 3333 필요, load 없음)",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/register/C/build/01_led_blink/firmware.elf",
@@ -14,10 +14,10 @@
       "externalConsole": false
     },
     {
-      "name": "register/Rust/01_hello_world (OpenOCD 3333 \ud544\uc694, load \uc5c6\uc74c)",
+      "name": "register/Rust/01_hello_world (OpenOCD 3333 필요, load 없음)",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/register/Rust/01_hello_world/build/nucleo_f446re/firmware.elf",
+      "program": "${workspaceFolder}/register/Rust/01_hello_world/target/thumbv7em-none-eabihf/release/firmware",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
       "miDebuggerPath": "/Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
@@ -26,10 +26,10 @@
       "externalConsole": false
     },
     {
-      "name": "register/Rust/02_led_blink (OpenOCD 3333 \ud544\uc694, load \uc5c6\uc74c)",
+      "name": "register/Rust/02_led_blink (OpenOCD 3333 필요, load 없음)",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/register/Rust/02_led_blink/build/nucleo_f446re/firmware.elf",
+      "program": "${workspaceFolder}/register/Rust/02_led_blink/target/thumbv7em-none-eabihf/release/firmware",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
       "miDebuggerPath": "/Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
@@ -38,7 +38,7 @@
       "externalConsole": false
     },
     {
-      "name": "register/C/02_gpio_button (OpenOCD 3333 \ud544\uc694, load \uc5c6\uc74c)",
+      "name": "register/C/02_gpio_button (OpenOCD 3333 필요, load 없음)",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/register/C/build/02_gpio_button/firmware.elf",
@@ -50,10 +50,10 @@
       "externalConsole": false
     },
     {
-      "name": "register/Rust/02_gpio_button (OpenOCD 3333 \ud544\uc694, load \uc5c6\uc74c)",
+      "name": "register/Rust/02_gpio_button (OpenOCD 3333 필요, load 없음)",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/register/Rust/02_gpio_button/build/nucleo_f446re/firmware.elf",
+      "program": "${workspaceFolder}/register/Rust/02_gpio_button/target/thumbv7em-none-eabihf/release/firmware",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
       "miDebuggerPath": "/Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",

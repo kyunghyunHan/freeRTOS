@@ -3,39 +3,26 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#define RCC_BASE 0x40023800UL
+#define RCC_AHB1ENR (*(volatile uint32_t *)(RCC_BASE + 0x30UL))
 
-#define RCC_BASE       0x40023800UL
-#define RCC_AHB1ENR    (*(volatile uint32_t *)(RCC_BASE + 0x30UL))
+#define GPIOB_BASE 0x40020400UL
 
-/* =========================================
- * 2. GPIOB - LED
- * ========================================= */
+#define GPIOB_MODER (*(volatile uint32_t *)(GPIOB_BASE + 0x00UL))
+#define GPIOB_OTYPER (*(volatile uint32_t *)(GPIOB_BASE + 0x04UL))
+#define GPIOB_PUPDR (*(volatile uint32_t *)(GPIOB_BASE + 0x0CUL))
+#define GPIOB_BSRR (*(volatile uint32_t *)(GPIOB_BASE + 0x18UL))
 
-#define GPIOB_BASE     0x40020400UL
+#define LD1_PIN 0U
+#define LD2_PIN 7U
 
-#define GPIOB_MODER    (*(volatile uint32_t *)(GPIOB_BASE + 0x00UL))
-#define GPIOB_OTYPER   (*(volatile uint32_t *)(GPIOB_BASE + 0x04UL))
-#define GPIOB_PUPDR    (*(volatile uint32_t *)(GPIOB_BASE + 0x0CUL))
-#define GPIOB_BSRR     (*(volatile uint32_t *)(GPIOB_BASE + 0x18UL))
+#define GPIOC_BASE 0x40020800UL
 
-#define LD1_PIN        0U
-#define LD2_PIN        7U
+#define GPIOC_MODER (*(volatile uint32_t *)(GPIOC_BASE + 0x00UL))
+#define GPIOC_PUPDR (*(volatile uint32_t *)(GPIOC_BASE + 0x0CUL))
+#define GPIOC_IDR (*(volatile uint32_t *)(GPIOC_BASE + 0x10UL))
 
-/* =========================================
- * 3. GPIOC - Button
- * ========================================= */
-
-#define GPIOC_BASE     0x40020800UL
-
-#define GPIOC_MODER    (*(volatile uint32_t *)(GPIOC_BASE + 0x00UL))
-#define GPIOC_PUPDR    (*(volatile uint32_t *)(GPIOC_BASE + 0x0CUL))
-#define GPIOC_IDR      (*(volatile uint32_t *)(GPIOC_BASE + 0x10UL))
-
-#define BUTTON_PIN     13U
-
-/* =========================================
- * 4. GPIO Initialization
- * ========================================= */
+#define BUTTON_PIN 13U
 
 static void GPIO_Init(void)
 {
@@ -49,8 +36,8 @@ static void GPIO_Init(void)
           (3UL << (LD2_PIN * 2U)));
 
     GPIOB_MODER |=
-         (1UL << (LD1_PIN * 2U)) |
-         (1UL << (LD2_PIN * 2U));
+        (1UL << (LD1_PIN * 2U)) |
+        (1UL << (LD2_PIN * 2U));
 
     /* PB0 / PB7 Push-Pull */
     GPIOB_OTYPER &=
@@ -76,10 +63,7 @@ static void GPIO_Init(void)
         (1UL << (LD2_PIN + 16U));
 }
 
-/* =========================================
- * 5. Task 1 - Button Task
- * ========================================= */
-
+// Task1
 static void Button_Task(void *argument)
 {
     (void)argument;
@@ -103,9 +87,7 @@ static void Button_Task(void *argument)
     }
 }
 
-/* =========================================
- * 6. Task 2 - Blink Task
- * ========================================= */
+// Task2
 
 static void Blink_Task(void *argument)
 {
@@ -134,10 +116,7 @@ static void Blink_Task(void *argument)
     }
 }
 
-/* =========================================
- * 7. Main
- * ========================================= */
-
+// main
 int main(void)
 {
     /* GPIO 초기화 */
@@ -150,8 +129,7 @@ int main(void)
         256,
         NULL,
         tskIDLE_PRIORITY + 1,
-        NULL
-    );
+        NULL);
 
     /* Task 2 생성 */
     BaseType_t result2 = xTaskCreate(
@@ -160,8 +138,7 @@ int main(void)
         256,
         NULL,
         tskIDLE_PRIORITY + 1,
-        NULL
-    );
+        NULL);
 
     /* Task 생성 실패 검사 */
     if ((result1 != pdPASS) ||

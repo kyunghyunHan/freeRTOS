@@ -17,7 +17,8 @@ PA13/PA14 SWD는 사용하지 않습니다. GPIO toggle은 단일 소유 태스�
 여러 작성자가 동시에 toggle하면 읽기/갱신 조합은 원자적이지 않으므로 소유권 또는 잠금이 필요합니다.
 
 C main은 xTaskCreate로 태스크를 만든 뒤 vTaskStartScheduler를 호출합니다.
-Rust 예제도 자체 C main에서 같은 커널을 시작하고 태스크 진입점 안에서 rust_task를 호출합니다.
+Rust 예제는 Rust main에서 xTaskCreate와 vTaskStartScheduler를 호출합니다.
+앱의 진입점과 태스크는 Rust이고, FreeRTOS 커널과 CMSIS 런타임은 C/ASM입니다.
 
 ## 스케줄러와 tick
 
@@ -46,7 +47,7 @@ MSP 여유는 별도로 확인해야 합니다.
 
 configUSE_MALLOC_FAILED_HOOK=1, configCHECK_FOR_STACK_OVERFLOW=2, configASSERT를 활성화했습니다.
 기본 오류 처리는 IRQ를 끄고 g_freertos_diagnostic에 원인과 fault 레지스터를 저장한 채 정지합니다.
-앱 자체 오류 함수가 있으면 그 정의가 우선하며 기존 예제는 g_diagnostic을 사용합니다.
+Rust 예제는 공통 g_freertos_diagnostic을 사용합니다. 앱 자체 오류 함수가 있으면 그 정의가 우선합니다.
 reason: 1 할당 실패, 2 스택 overflow, 3 assert, 4 HardFault, 5 Rust panic,
 6 scheduler 반환, 7 태스크 생성 실패입니다. file/line/task/name도 해당 경로에서 저장합니다.
 오류 처리에서 heap이나 UART를 사용하지 않습니다.
@@ -70,7 +71,7 @@ ISR에서는 vTaskDelay/일반 mutex 대기 API를 호출할 수 없습니다. �
 | 보드 설정 | Devicetree/Kconfig | 직접 레지스터 접근 + 예제별 FreeRTOSConfig.h |
 | 시작/링커 | 보드 빌드가 자동 구성 | ST startup + 예제별 명시적 linker |
 | 드라이버 | 커널과 통합된 장치 API | 예제 소스에서 직접 레지스터 초기화 |
-| 태스크 | 기본 main thread + k_thread | C main이 xTaskCreate/scheduler 시작 |
+| 태스크 | 기본 main thread + k_thread | 앱의 C/Rust main이 xTaskCreate/scheduler 시작 |
 | 지연 | k_msleep | vTaskDelay |
 | Rust | Zephyr 공식 모듈/CMake integration | 작은 로컬 C ABI + Rust staticlib |
 
