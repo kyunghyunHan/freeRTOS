@@ -6,7 +6,8 @@ FreeRTOS는 실행 가능한 태스크 중 우선순위가 높은 태스크에 C
 
 ST 공식 startup의 벡터 첫 항목은 MSP 초기값 0x20020000이고 Reset_Handler가 SystemInit을 호출합니다.
 .data를 Flash에서 RAM으로 복사하고 .bss를 0으로 지운 뒤 C library init와 main을 호출합니다.
-SystemInit은 FPU를 활성화합니다. 각 예제의 C main은 내부 HSI 16MHz와 AHB/APB prescaler /1을 명시합니다.
+SystemInit은 FPU를 활성화합니다. 리셋 기본 클록은 내부 HSI 16MHz입니다. 기존 main이 설정을 바꾸거나 유지할 수 있습니다.
+공통 런타임은 main 전 벡터를 설정하고, scheduler 직전에 SystemCoreClock을 갱신합니다.
 보드의 외부 크리스털·ST-LINK MCO에 의존하지 않습니다. PLL/180MHz 구성은 사용하지 않습니다.
 STM32F446RE의 Flash 512KiB, SRAM 128KiB 전체를 링커에 선언하며 마지막 4KiB는 MSP 전용 영역으로 예약합니다.
 .data/.bss가 124KiB RAM 영역을 넘으면 링크 오류가 납니다.
@@ -44,7 +45,8 @@ uxTaskGetStackHighWaterMark(NULL)는 해당 태스크의 남은 최소 stack wor
 MSP 여유는 별도로 확인해야 합니다.
 
 configUSE_MALLOC_FAILED_HOOK=1, configCHECK_FOR_STACK_OVERFLOW=2, configASSERT를 활성화했습니다.
-실패하면 IRQ를 끄고 g_diagnostic에 원인과 fault 레지스터를 저장한 채 정지합니다.
+기본 오류 처리는 IRQ를 끄고 g_freertos_diagnostic에 원인과 fault 레지스터를 저장한 채 정지합니다.
+앱 자체 오류 함수가 있으면 그 정의가 우선하며 기존 예제는 g_diagnostic을 사용합니다.
 reason: 1 할당 실패, 2 스택 overflow, 3 assert, 4 HardFault, 5 Rust panic,
 6 scheduler 반환, 7 태스크 생성 실패입니다. file/line/task/name도 해당 경로에서 저장합니다.
 오류 처리에서 heap이나 UART를 사용하지 않습니다.

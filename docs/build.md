@@ -1,122 +1,80 @@
-# 빌드와 clean
+# 빌드
 
-모든 명령은 프로젝트 루트에서 실행합니다. 현재 빌드 대상은 `register/`의 예제입니다.
+모든 명령은 프로젝트 루트 기준입니다. CMake + Ninja와 `arm-zephyr-eabi-gcc`를 사용합니다.
+기존 C 예제별 폴더는 정리했으므로 아래 경로로 새로 구성하세요.
 
-폴더 분리 또는 빌드 구조 변경 전에 생성한 빌드 캐시에는 이전 경로가 남습니다. 기존 빌드 폴더는
-그대로 재사용하지 말고, 아래 최초 설정 명령에 `--fresh`를 추가해 다시 구성하세요.
+## C
 
-## 최초 설정
+`register/C/`의 `.c` 파일명에서 확장자를 뺀 이름을 `APP`에 전달합니다.
+기본값은 `02_gpio_button`입니다. 파일마다 CMakeLists.txt는 만들지 않습니다.
 
 ```bash
-cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
-cmake -S register/C/01_led_blink -B register/C/01_led_blink/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build register/C/01_led_blink/build/nucleo_f446re
+cmake -S register/C -B register/C/build/02_gpio_button -G Ninja \
+  -DAPP=02_gpio_button -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/C/build/02_gpio_button
+
+cmake -S register/C -B register/C/build/01_led_blink -G Ninja \
+  -DAPP=01_led_blink -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/C/build/01_led_blink
+```
+
+새 파일 `register/C/main.c`를 복사한 경우:
+
+```bash
+cmake -S register/C -B register/C/build/main -G Ninja \
+  -DAPP=main -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/C/build/main
+```
+
+다른 파일을 선택할 때 `APP`를 바꾸고 별도 빌드 폴더를 사용하세요.
+코드 수정 후에는 `cmake --build`만 실행하면 됩니다.
+VS Code의 기존 C Configure/Build/Rebuild 태스크도 새 경로에 맞춰져 있습니다.
+
+## Rust
+
+```bash
 cmake -S register/Rust/01_hello_world -B register/Rust/01_hello_world/build/nucleo_f446re -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
 cmake --build register/Rust/01_hello_world/build/nucleo_f446re
 cmake -S register/Rust/02_led_blink -B register/Rust/02_led_blink/build/nucleo_f446re -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
 cmake --build register/Rust/02_led_blink/build/nucleo_f446re
-```
-
-## 02 GPIO 버튼 예제
-
-C/Rust 버전의 최초 설정과 보드 확인 절차는 [C 02](../register/C/02_gpio_button/README.md),
-[Rust 02](../register/Rust/02_gpio_button/README.md)를 참고하세요.
-
-```bash
-cmake -S register/C/02_gpio_button -B register/C/02_gpio_button/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build register/C/02_gpio_button/build/nucleo_f446re
 cmake -S register/Rust/02_gpio_button -B register/Rust/02_gpio_button/build/nucleo_f446re -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
 cmake --build register/Rust/02_gpio_button/build/nucleo_f446re
 ```
 
-## 코드 수정 후 빌드
+Rust는 의존성 crate 없이 `core`만 사용합니다. Cargo는 `--locked --offline`으로 실행됩니다.
+CMake가 Cargo 정적 라이브러리를 커널과 최종 링크합니다.
+CMake Debug, Rust dev profile(opt-level=s, panic=abort)를 사용합니다.
+CMake `Release`는 Cargo의 `--release`를 자동 선택하지 않습니다.
+
+## clean / 재구성
 
 ```bash
-cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
-cmake --build register/C/01_led_blink/build/nucleo_f446re
-cmake --build register/Rust/01_hello_world/build/nucleo_f446re
-cmake --build register/Rust/02_led_blink/build/nucleo_f446re
+cmake --build register/C/build/02_gpio_button --target clean
+cmake --build register/C/build/02_gpio_button --clean-first
 ```
 
-Ninja를 직접 실행해도 같습니다.
+Rust의 `--clean-first`는 Cargo 캐시를 지우지 않습니다. 전체 재컴파일이 필요하면:
 
 ```bash
-ninja -C register/C/01_led_blink/build/nucleo_f446re
-ninja -C register/Rust/01_hello_world/build/nucleo_f446re
-ninja -C register/Rust/02_led_blink/build/nucleo_f446re
-```
-
-## 전체 재빌드
-
-C:
-
-```bash
-cmake --build register/C/01_led_blink/build/nucleo_f446re --clean-first
-```
-
-Rust는 Cargo 캐시도 비웁니다.
-
-```bash
-cargo clean --manifest-path register/Rust/01_hello_world/Cargo.toml --target-dir register/Rust/01_hello_world/build/nucleo_f446re/rust/target
+cargo clean --manifest-path register/Rust/01_hello_world/Cargo.toml \
+  --target-dir register/Rust/01_hello_world/build/nucleo_f446re/rust/target
 cmake --build register/Rust/01_hello_world/build/nucleo_f446re --clean-first
-cargo clean --manifest-path register/Rust/02_led_blink/Cargo.toml --target-dir register/Rust/02_led_blink/build/nucleo_f446re/rust/target
-cmake --build register/Rust/02_led_blink/build/nucleo_f446re --clean-first
 ```
 
-## clean
-
-소스와 CMake 캐시를 유지하고 빌드 결과만 지웁니다.
-
-```bash
-cmake --build register/C/01_led_blink/build/nucleo_f446re --target clean
-cmake --build register/Rust/01_hello_world/build/nucleo_f446re --target clean
-cargo clean --manifest-path register/Rust/01_hello_world/Cargo.toml --target-dir register/Rust/01_hello_world/build/nucleo_f446re/rust/target
-cmake --build register/Rust/02_led_blink/build/nucleo_f446re --target clean
-cargo clean --manifest-path register/Rust/02_led_blink/Cargo.toml --target-dir register/Rust/02_led_blink/build/nucleo_f446re/rust/target
-```
-
-구성부터 다시 시작할 때는 대상 앱의 빌드 폴더만 삭제합니다.
-C 빌드 폴더를 삭제한 뒤 위의 최초 설정 명령을 다시 실행합니다.
-
-```bash
-rm -rf register/C/01_led_blink/build/nucleo_f446re
-```
-
-`--clean-first`는 Cargo 캐시를 지우지 않으므로 Rust 전체 재빌드에는 `cargo clean`도 필요합니다.
-CMake 캐시를 바꿀 때는 `cmake --fresh -S ... -B ...`에 최초의 toolchain/Debug 옵션을 모두 다시 전달하세요.
-
-## Cargo 직접 실행
-
-Rust 앱은 의존성 crate 없이 `core`만 사용하며 crates.io에 접근하지 않습니다.
-Cargo만 실행하면 정적 라이브러리까지 생성하며 보드용 최종 ELF는 CMake 링크가 필요합니다.
-
-```bash
-cargo build --manifest-path register/Rust/01_hello_world/Cargo.toml --target thumbv7em-none-eabihf \
-  --target-dir register/Rust/01_hello_world/build/nucleo_f446re/rust/target --locked --offline
-cargo build --manifest-path register/Rust/02_led_blink/Cargo.toml --target thumbv7em-none-eabihf \
-  --target-dir register/Rust/02_led_blink/build/nucleo_f446re/rust/target --locked --offline
-cmake --build register/Rust/01_hello_world/build/nucleo_f446re
-cmake --build register/Rust/02_led_blink/build/nucleo_f446re
-```
-
-CMake Debug, Rust dev profile(opt-level=s, debug info, panic=abort)를 사용합니다.
-CMake `Release`로 바꿔도 Cargo는 자동으로 `--release`로 바뀌지 않습니다.
+캐시를 초기화하려면 최초 구성 명령에 `--fresh`를 추가하고 모든 옵션을 다시 전달합니다.
 
 ## 결과 파일
 
-모든 앱은 `앱/build/nucleo_f446re/`에 다음 파일을 생성합니다.
-
 | 파일 | 용도 |
 |---|---|
-| firmware.elf | 디버그 심볼과 load 주소가 있는 Flash/GDB 입력 |
+| firmware.elf | Flash/GDB 입력, 디버그 심볼 |
 | firmware.hex | 주소가 포함된 Intel HEX |
-| firmware.bin | raw 이미지, Flash 주소 0x08000000을 따로 지정 |
-| firmware.map | 함수·데이터·heap·스택의 링크 배치 |
-| compile_commands.json | C/ASM 코드 탐색용 실제 컴파일 명령 |
-| rust/target/thumbv7em-none-eabihf/debug/librustapp.a | Rust 앱만의 정적 라이브러리, Rust 앱에만 있음 |
+| firmware.bin | raw 이미지, Flash 주소 0x08000000 별도 지정 |
+| firmware.map | 코드·데이터·heap·스택 배치 |
+| compile_commands.json | C/ASM 탐색용 컴파일 명령 |
+| rust/target/thumbv7em-none-eabihf/debug/librustapp.a | Rust 앱의 정적 라이브러리 |
 
+호환 설정과 공통 지원 코드는 [CubeIDE 문서](cubeide.md)를 참고하세요.

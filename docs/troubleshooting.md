@@ -16,7 +16,10 @@
 | Blink 시작 로그를 놓침 | 시리얼 터미널 연결 후 NRST |
 | Flash reset/SWD WAIT | NRST 연결, 다른 서버 종료, reset 중 연결 옵션 확인 |
 | RAM overlaps | heap·태스크 stack 크기와 firmware.map 확인 |
-| LED 정지 | GDB에서 g_diagnostic, PC, backtrace 확인 |
+| LED 정지 | GDB에서 g_freertos_diagnostic 또는 앱의 g_diagnostic, PC 확인 |
 
 Cargo 출력 폴더의 `CACHEDIR.TAG`은 공통 CMake가 빌드 전에 생성합니다.
 `size`의 bss에는 4KiB MSP 예약이 포함되며, heap_4의 32KiB도 정적 RAM에 포함됩니다.
+
+Hook 또는 firmware_assert 링크 오류가 나면 공통 `cmake/firmware.cmake`가 포함되는지 확인하세요.
+C 예제의 예전 폴더 대신 `cmake -S register/C -DAPP=파일명`으로 구성합니다.

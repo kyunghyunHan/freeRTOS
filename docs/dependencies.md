@@ -1,7 +1,8 @@
 # 의존성과 복원
 
 커널·CMSIS 버전은 `external/dependencies.lock.json`에 고정합니다.
-초기화와 GPIO/UART 제어는 각 예제 소스의 레지스터 접근 코드에 있습니다.
+GPIO/UART 제어는 각 예제 소스의 레지스터 접근 코드에 있습니다.
+C 공통 설정은 `cmake/FreeRTOSConfig.h`, Rust 설정은 각 예제 폴더에 있습니다.
 C 장치 헤더와 startup은 ST CMSIS를 사용합니다.
 
 | 폴더 | 공식 출처 | 태그 | commit |

@@ -16,7 +16,7 @@ cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
 /opt/homebrew/bin/openocd -s /opt/homebrew/share/openocd/scripts \
   -f board/st_nucleo_f4.cfg \
   -c 'reset_config srst_only srst_nogate connect_assert_srst' \
-  -c 'program register/C/01_led_blink/build/nucleo_f446re/firmware.elf verify reset exit'
+  -c 'program register/C/build/01_led_blink/firmware.elf verify reset exit'
 ```
 
 Rust UART Hello World:
@@ -84,7 +84,7 @@ Rust Blink는 시작 시 한 줄만 출력하므로 터미널 연결 뒤 NRST를
 
 ```bash
 /Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb \
-  register/C/01_led_blink/build/nucleo_f446re/firmware.elf
+  register/C/build/01_led_blink/firmware.elf
 ```
 
 GDB 안에서 실행:

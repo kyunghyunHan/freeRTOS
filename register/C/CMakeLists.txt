@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.24)
+project(register_c C ASM)
+
+set(APP "02_gpio_button" CACHE STRING "C filename without extension")
+if(NOT APP MATCHES "^[A-Za-z0-9_-]+$")
+  message(FATAL_ERROR "APP must be a filename without extension")
+endif()
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${APP}.c")
+  message(FATAL_ERROR "C source not found: ${APP}.c")
+endif()
+
+set(FIRMWARE_CONFIG_DIR "${CMAKE_CURRENT_LIST_DIR}/../../cmake" CACHE PATH "FreeRTOSConfig.h directory")
+set(FIRMWARE_LINKER_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/../../cmake/stm32f446re.ld" CACHE FILEPATH "Linker script")
+include(../../cmake/firmware.cmake)
+target_sources(firmware PRIVATE "${APP}.c")

@@ -10,7 +10,7 @@ NUCLEO-F446RE 내장 B1 USER 버튼 하나로 LD2 LED를 토글합니다. 추가
 - 리셋할 때 누르고 있으면 디바운스 후 한 번 토글합니다. 매우 짧은 누름은 무시될 수 있습니다.
 
 버튼 회로 기준: [ST MB1136 회로도, MCU 페이지](https://www.st.com/resource/en/schematic_pack/mb1136-default-c04_schematic.pdf).
-GPIO 레지스터는 각 예제 소스에서 직접 접근합니다. C는 `src/main.c`의 CMSIS 레지스터 정의를,
+GPIO 레지스터는 각 예제 소스에서 직접 접근합니다. C는 `register/C/02_gpio_button.c`의 CMSIS 레지스터 정의를,
 Rust는 `src/lib.rs`의 실제 주소와 volatile 읽기/쓰기를 사용합니다. 디바운스 로직도 각 예제에 있습니다.
 
 ## 빌드
@@ -18,14 +18,14 @@ Rust는 `src/lib.rs`의 실제 주소와 volatile 읽기/쓰기를 사용합니�
 프로젝트 루트에서 실행합니다.
 
 ```bash
-cmake -S register/C/02_gpio_button -B register/C/02_gpio_button/build/nucleo_f446re -G Ninja \
+cmake -S register/C -DAPP=02_gpio_button -B register/C/build/02_gpio_button -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build register/C/02_gpio_button/build/nucleo_f446re
+cmake --build register/C/build/02_gpio_button
 ```
 
-결과: `register/C/02_gpio_button/build/nucleo_f446re/firmware.elf`, `firmware.hex`, `firmware.bin`.
+결과: `register/C/build/02_gpio_button/firmware.elf`, `firmware.hex`, `firmware.bin`.
 VS Code의 `register/C/02_gpio_button: Build` 태스크로도 빌드할 수 있습니다.
-보드 기록 방법은 [Flash·디버그](../../../docs/flash-and-debug.md)를 참고하세요.
+보드 기록 방법은 [Flash·디버그](../flash-and-debug.md)를 참고하세요.
 
 ## 보드 확인
 

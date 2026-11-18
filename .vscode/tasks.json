@@ -7,13 +7,14 @@
       "command": "/opt/homebrew/bin/cmake",
       "args": [
         "-S",
-        "register/C/01_led_blink",
+        "register/C",
         "-B",
-        "register/C/01_led_blink/build/nucleo_f446re",
+        "register/C/build/01_led_blink",
         "-G",
         "Ninja",
         "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-gcc.cmake",
-        "-DCMAKE_BUILD_TYPE=Debug"
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DAPP=01_led_blink"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -26,7 +27,7 @@
       "command": "/opt/homebrew/bin/cmake",
       "args": [
         "--build",
-        "register/C/01_led_blink/build/nucleo_f446re"
+        "register/C/build/01_led_blink"
       ],
       "dependsOn": "register/C/01_led_blink: Configure",
       "options": {
@@ -42,7 +43,7 @@
       "command": "/opt/homebrew/bin/cmake",
       "args": [
         "--build",
-        "register/C/01_led_blink/build/nucleo_f446re",
+        "register/C/build/01_led_blink",
         "--clean-first"
       ],
       "dependsOn": "register/C/01_led_blink: Configure",
@@ -207,13 +208,14 @@
       "command": "/opt/homebrew/bin/cmake",
       "args": [
         "-S",
-        "register/C/02_gpio_button",
+        "register/C",
         "-B",
-        "register/C/02_gpio_button/build/nucleo_f446re",
+        "register/C/build/02_gpio_button",
         "-G",
         "Ninja",
         "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-gcc.cmake",
-        "-DCMAKE_BUILD_TYPE=Debug"
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DAPP=02_gpio_button"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -226,7 +228,7 @@
       "command": "/opt/homebrew/bin/cmake",
       "args": [
         "--build",
-        "register/C/02_gpio_button/build/nucleo_f446re"
+        "register/C/build/02_gpio_button"
       ],
       "dependsOn": "register/C/02_gpio_button: Configure",
       "options": {
@@ -242,7 +244,7 @@
       "command": "/opt/homebrew/bin/cmake",
       "args": [
         "--build",
-        "register/C/02_gpio_button/build/nucleo_f446re",
+        "register/C/build/02_gpio_button",
         "--clean-first"
       ],
       "dependsOn": "register/C/02_gpio_button: Configure",

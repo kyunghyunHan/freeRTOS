@@ -6,36 +6,40 @@ CMake와 Ninja로 빌드하며, Rust 예제는 Cargo로 만든 정적 라이브�
 ```text
 freeRTOS/
 ├── register/              # 레지스터 직접 제어 버전
-│   ├── C/                # LED, 버튼 예제 + 03~07 예약 폴더
+│   ├── C/                # .c 예제 파일 + CMakeLists.txt 하나
 │   └── Rust/             # UART 로그, LED, 버튼 예제
 ├── hal/                   # HAL 버전용 예약 폴더 (아직 미구현)
-├── cmake/                 # 컴파일·링크 설정만 공유
+├── cmake/                 # C 공통 설정/링커/FreeRTOS 지원 코드
 ├── external/              # 공식 의존성, dependencies.lock.json
 ├── docs/
 └── .vscode/
 ```
 
-현재 구현은 모두 `register/`에 있습니다. C는 CMSIS 레지스터 정의로 직접 접근하고,
-Rust는 실제 레지스터 주소에 `read_volatile` / `write_volatile`을 사용합니다.
-각 예제는 `FreeRTOSConfig.h`, 링커 스크립트, 오류 hook을 자체 포함합니다.
-`hal/`의 구분과 구현 상태는 [HAL 안내](hal/README.md)를 참고하세요.
+C 실습은 `register/C/01_led_blink.c`, `02_gpio_button.c`처럼 파일 하나로 작성합니다.
+새 `.c` 파일을 추가해도 CMakeLists.txt를 수정할 필요가 없습니다.
+FreeRTOS Hook은 자동 제공되며 GPIO는 예제에서 레지스터를 직접 다룹니다.
+Rust 예제와 [HAL 예약 폴더](hal/README.md)는 유지합니다.
 
-소스는 각 앱의 `src/`, 빌드 결과는 `build/nucleo_f446re/`에 있습니다.
-C 03~07은 구현 전 폴더입니다.
-버튼 예제: [C 02](register/C/02_gpio_button/README.md), [Rust 02](register/Rust/02_gpio_button/README.md).
+## C 빌드
 
-## 빌드
-
-최초 설정은 [빌드 문서](docs/build.md)를 따릅니다. 이후 코드 수정 시:
+프로젝트 루트에서 실행합니다.
 
 ```bash
-cd /Users/hangyeonghyeon/Desktop/Rust/hardware/freeRTOS
-cmake --build register/C/01_led_blink/build/nucleo_f446re
-cmake --build register/C/02_gpio_button/build/nucleo_f446re
-cmake --build register/Rust/01_hello_world/build/nucleo_f446re
-cmake --build register/Rust/02_led_blink/build/nucleo_f446re
-cmake --build register/Rust/02_gpio_button/build/nucleo_f446re
+cmake -S register/C -B register/C/build/01_led_blink -G Ninja \
+  -DAPP=01_led_blink -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/C/build/01_led_blink
 ```
+```
+openocd -f board/st_nucleo_f4.cfg \
+  -c "program register/C/build/01_led_blink/firmware.elf verify reset exit"
+```
+
+`APP`는 확장자를 뺀 파일명입니다. CubeIDE의 `main.c`를 `register/C/main.c`로 복사했다면
+`-DAPP=main -B register/C/build/main`을 사용합니다. 앱마다 빌드 폴더를 나눕니다.
+결과는 해당 빌드 폴더의 `firmware.elf`, `firmware.hex`, `firmware.bin`입니다.
+
+자세한 [빌드 방법](docs/build.md), [CubeIDE 호환 범위](docs/cubeide.md),
+[C 버튼 설명](docs/c-examples/02_gpio_button.md), [Rust 버튼 설명](register/Rust/02_gpio_button/README.md)을 참고하세요.
 
 다섯 예제의 ELF/HEX/BIN 빌드는 확인했습니다. 보드 기록과 LED/UART 동작은 미검증입니다.
 
@@ -47,6 +51,7 @@ cmake --build register/Rust/02_gpio_button/build/nucleo_f446re
 | [Flash·디버그](docs/flash-and-debug.md) | 기록, 전체 삭제, UART, GDB |
 | [RTOS 원리](docs/rtos.md) | 태스크, 메모리, 인터럽트, Zephyr 비교 |
 | [Rust](docs/rust.md) | C ABI, unsafe, panic, 메모리 |
+| [CubeIDE 호환](docs/cubeide.md) | main.c 복사, 설정, 제한사항 |
 | [예제 추가](docs/development.md) | C/Rust 앱 추가 |
 | [문제 해결](docs/troubleshooting.md) | 빌드·연결 오류 |
 | [검증 결과](docs/verification.md) | 빌드 결과와 미검증 항목 |

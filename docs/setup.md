@@ -55,8 +55,8 @@ export RUSTUP_TOOLCHAIN=1.99.0
 프로젝트 루트를 열고 clangd, Rust Analyzer, Microsoft C/C++(GDB), CMake Tools를 설치합니다.
 `.vscode/extensions.json`에서 목록을 확인할 수 있습니다.
 
-Tasks의 Configure/Build/Rebuild로 빌드합니다.
-C 탐색은 `register/C/01_led_blink/build/nucleo_f446re/compile_commands.json`을 사용합니다.
+Tasks의 Configure/Build/Rebuild로 빌드합니다. C 예제는 `register/C/`의 파일을 `APP`로 선택합니다.
+C 탐색은 `register/C/build/01_led_blink/compile_commands.json`을 사용합니다.
 Rust 예제의 C 시작 코드를 탐색하려면 settings의 clangd `--compile-commands-dir`을
 `register/Rust/02_led_blink/build/nucleo_f446re`로 바꾸고 clangd를 재시작합니다.
 Rust Analyzer에는 세 앱과 `thumbv7em-none-eabihf` 타깃이 등록되어 있습니다.

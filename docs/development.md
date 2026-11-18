@@ -1,31 +1,18 @@
 # 새 예제 추가
 
-모든 명령은 프로젝트 루트 기준입니다. 기존 대상 폴더가 있으면 덮어쓰지 마세요.
-각 예제는 레지스터 초기화, FreeRTOS 설정, 링커, hook을 자체 포함합니다.
-
-## C
-
-빌드 산출물을 제외하고 필요한 소스와 설정만 복사합니다.
+C 예제는 `register/C/`에 `.c` 파일 하나만 추가합니다.
 
 ```bash
-mkdir -p register/C/08_my_task/src
-cp -n register/C/01_led_blink/CMakeLists.txt register/C/08_my_task/
-cp -n register/C/01_led_blink/FreeRTOSConfig.h register/C/08_my_task/
-cp -n register/C/01_led_blink/stm32f446re.ld register/C/08_my_task/
-cp -n register/C/01_led_blink/src/main.c register/C/08_my_task/src/
+cp /path/to/CubeIDE/Core/Src/main.c register/C/03_uart.c
+cmake -S register/C -B register/C/build/03_uart -G Ninja \
+  -DAPP=03_uart -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
+cmake --build register/C/build/03_uart
 ```
 
-CMake project 이름과 `src/main.c`를 수정합니다.
-`include(../../../cmake/firmware.cmake)`는 컴파일·링크 설정만 공유합니다.
-GPIO/UART는 예제 소스에서 직접 레지스터를 다룹니다.
-
-```bash
-cmake -S register/C/08_my_task -B register/C/08_my_task/build/nucleo_f446re -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/arm-gcc.cmake" -DCMAKE_BUILD_TYPE=Debug
-cmake --build register/C/08_my_task/build/nucleo_f446re
-```
-
-03~07 예약 폴더도 같은 최소 파일을 추가하면 됩니다. 현재 README만 있고 빌드 대상은 아닙니다.
+`APP`는 확장자를 뺀 파일명입니다. CMakeLists.txt 수정이나 새 소스 폴더는 필요 없습니다.
+C 공통 FreeRTOSConfig.h와 링커는 `cmake/`에 있습니다. Hook은 자동 연결됩니다.
+프로젝트별 설정과 추가 헤더는 [CubeIDE 호환 문서](cubeide.md)의 CMake 옵션으로 지정합니다.
+03~07의 기존 예약 설명은 `docs/c-examples/`에 보관합니다.
 
 ## Rust
 

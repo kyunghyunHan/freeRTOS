@@ -1,16 +1,17 @@
 {
   "cmake.configureOnOpen": false,
-  "cmake.sourceDirectory": "${workspaceFolder}/register/C/01_led_blink",
-  "cmake.buildDirectory": "${workspaceFolder}/register/C/01_led_blink/build/nucleo_f446re",
+  "cmake.sourceDirectory": "${workspaceFolder}/register/C",
+  "cmake.buildDirectory": "${workspaceFolder}/register/C/build/01_led_blink",
   "cmake.configureSettings": {
     "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/cmake/arm-gcc.cmake",
-    "CMAKE_BUILD_TYPE": "Debug"
+    "CMAKE_BUILD_TYPE": "Debug",
+    "APP": "01_led_blink"
   },
   "C_Cpp.intelliSenseEngine": "disabled",
   "clangd.path": "/opt/homebrew/opt/llvm/bin/clangd",
   "clangd.arguments": [
     "--background-index",
-    "--compile-commands-dir=${workspaceFolder}/register/C/01_led_blink/build/nucleo_f446re",
+    "--compile-commands-dir=${workspaceFolder}/register/C/build/01_led_blink",
     "--query-driver=/Users/hangyeonghyeon/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc"
   ],
   "rust-analyzer.linkedProjects": [

@@ -12,12 +12,14 @@ SECTIONS {
   .ARM.extab : { *(.ARM.extab*) } > FLASH
   .ARM.exidx : { __exidx_start = .; *(.ARM.exidx*) __exidx_end = .; } > FLASH
   .preinit_array : {
+    PROVIDE_HIDDEN(__bothinit_array_start = .);
     PROVIDE_HIDDEN(__preinit_array_start = .); KEEP(*(.preinit_array*))
     PROVIDE_HIDDEN(__preinit_array_end = .);
   } > FLASH
   .init_array : {
     PROVIDE_HIDDEN(__init_array_start = .); KEEP(*(SORT(.init_array.*))) KEEP(*(.init_array))
     PROVIDE_HIDDEN(__init_array_end = .);
+    PROVIDE_HIDDEN(__bothinit_array_end = .);
   } > FLASH
   .fini_array : {
     PROVIDE_HIDDEN(__fini_array_start = .); KEEP(*(SORT(.fini_array.*))) KEEP(*(.fini_array))
