@@ -60,39 +60,23 @@ static void GPIO_Init(void)
 
 // Task Function
 static void Blink_500ms_Task(void *argument)
-
 {
-
     (void)argument;
-
     uint32_t led_on = 0U;
-
     for (;;)
-
     {
-
         led_on ^= 1U;
-
         if (led_on != 0U)
-
         {
-
             /* LD1 ON */
-
             GPIOB_BSRR = (1UL << LD1_PIN);
         }
-
         else
-
         {
-
             /* LD1 OFF */
-
             GPIOB_BSRR = (1UL << (LD1_PIN + 16U));
         }
-
         /* 500ms 동안 Blocked */
-
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
@@ -106,37 +90,22 @@ static void Blink_500ms_Task(void *argument)
 static void Blink_1000ms_Task(void *argument)
 
 {
-
     (void)argument;
-
     uint32_t led_on = 0U;
-
     for (;;)
-
     {
-
         led_on ^= 1U;
-
         if (led_on != 0U)
-
         {
-
             /* LD3 ON */
-
             GPIOB_BSRR = (1UL << LD3_PIN);
         }
-
         else
-
         {
-
             /* LD3 OFF */
-
             GPIOB_BSRR = (1UL << (LD3_PIN + 16U));
         }
-
         /* 1000ms 동안 Blocked */
-
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
