@@ -6,11 +6,8 @@
 #include <stdint.h>
 #include <string.h>
 
-/* 실습 선택 */
-#define LAB_MODE   1
-
-/* Priority Inversion 비교: 0=Binary Semaphore, 1=Mutex */
-#define USE_MUTEX  0
+/* 0: Inversion (Binary Semaphore), 1: Inheritance (Mutex) */
+#define USE_MUTEX  1
 
 /* Task 설정: Stack 단위는 Word */
 #define NUM_TASK_COUNT  9U
@@ -21,9 +18,6 @@ UART_HandleTypeDef huart3;
 
 /* 동기화 객체 */
 static SemaphoreHandle_t resourceLock;
-static SemaphoreHandle_t mutexA;
-static SemaphoreHandle_t mutexB;
-static SemaphoreHandle_t recursiveMutex;
 static SemaphoreHandle_t uartMutex;
 
 /* Task 번호 */
@@ -82,8 +76,6 @@ static void BusyWork(uint32_t ms)
 static void StartNumTask(void *argument)
 {
     uint32_t id = *(uint32_t *)argument;
-
-#if LAB_MODE == 1
 
     /*
      * Priority Inversion / Inheritance
@@ -160,138 +152,10 @@ static void StartNumTask(void *argument)
         }
     }
 
-#elif LAB_MODE == 2
 
     /*
-     * Deadlock
-     * Task 1: Mutex A -> Mutex B
-     * Task 2: Mutex B -> Mutex A
-     */
-
-    if (id == 1)
-    {
-        xSemaphoreTake(mutexA, portMAX_DELAY);
-        UART_Log(id, " Mutex A acquired\r\n");
-
-        /* Task 2에게 시작 신호 */
-        xTaskNotifyGive(numTaskHandles[1]);
-
-        /* Task 2가 Mutex B를 잡을 때까지 대기 */
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-        UART_Log(id, " Waiting Mutex B\r\n");
-
-        /* Task 2가 Mutex B를 소유함 */
-        xSemaphoreTake(mutexB, portMAX_DELAY);
-
-        /* Deadlock에서는 도달하지 못함 */
-        UART_Log(id, " Mutex B acquired\r\n");
-
-        xSemaphoreGive(mutexB);
-        xSemaphoreGive(mutexA);
-    }
-    else if (id == 2)
-    {
-        /* Task 1이 Mutex A를 잡을 때까지 대기 */
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-        xSemaphoreTake(mutexB, portMAX_DELAY);
-        UART_Log(id, " Mutex B acquired\r\n");
-
-        /* Task 1에게 Mutex B 획득 알림 */
-        xTaskNotifyGive(numTaskHandles[0]);
-
-        UART_Log(id, " Waiting Mutex A\r\n");
-
-        /* Task 1이 Mutex A를 소유함 */
-        xSemaphoreTake(mutexA, portMAX_DELAY);
-
-        /* Deadlock에서는 도달하지 못함 */
-        UART_Log(id, " Mutex A acquired\r\n");
-
-        xSemaphoreGive(mutexA);
-        xSemaphoreGive(mutexB);
-    }
-
-#elif LAB_MODE == 3
-
-    /*
-     * Self-Deadlock
-     * 같은 Task가 일반 Mutex를 두 번 획득
-     */
-
-    if (id == 1)
-    {
-        UART_Log(id, " First Mutex Take\r\n");
-
-        xSemaphoreTake(mutexA, portMAX_DELAY);
-
-        UART_Log(id, " First Take Success\r\n");
-
-        /* 이미 보유한 Mutex를 다시 요청 */
-        UART_Log(id, " Second Mutex Take\r\n");
-
-        /* 여기서 자기 자신을 기다리며 Blocked */
-        xSemaphoreTake(mutexA, portMAX_DELAY);
-
-        /* Self-Deadlock에서는 도달하지 못함 */
-        UART_Log(id, " Second Take Success\r\n");
-
-        xSemaphoreGive(mutexA);
-        xSemaphoreGive(mutexA);
-    }
-
-#elif LAB_MODE == 4
-
-    /*
-     * Recursive Mutex
-     * 같은 Task의 중복 획득 허용
-     */
-
-    if (id == 1)
-    {
-        for (;;)
-        {
-            UART_Log(id, " First Recursive Take\r\n");
-
-            if (xSemaphoreTakeRecursive(
-                    recursiveMutex,
-                    portMAX_DELAY) == pdTRUE)
-            {
-                UART_Log(id, " Recursion Count = 1\r\n");
-
-                /* 같은 Task가 다시 획득 */
-                if (xSemaphoreTakeRecursive(
-                        recursiveMutex,
-                        portMAX_DELAY) == pdTRUE)
-                {
-                    UART_Log(id, " Recursion Count = 2\r\n");
-
-                    UART_Log(id, " Shared Resource Work\r\n");
-
-                    /* 두 번째 획득분 반환 */
-                    xSemaphoreGiveRecursive(recursiveMutex);
-
-                    UART_Log(id, " Recursion Count = 1\r\n");
-                }
-
-                /* 첫 번째 획득분 반환 */
-                xSemaphoreGiveRecursive(recursiveMutex);
-
-                UART_Log(id, " Recursion Count = 0\r\n");
-            }
-
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-    }
-
-#else
-#error "LAB_MODE must be 1, 2, 3 or 4"
-#endif
-
-    /*
-     * 실습 외의 NumTask도 유지.
-     * Task 1~3의 실험 종료 이후 일반 번호 출력.
+     * Task 4~9도 기존 NumTask 구조로 실행.
+     * Task 1~3은 실험 후 일반 반복 수행.
      */
 
     if (id >= 4)
@@ -322,8 +186,6 @@ int main(void)
         Error_Handler();
     }
 
-#if LAB_MODE == 1
-
 #if USE_MUTEX == 1
 
     /* Priority Inheritance 지원 */
@@ -346,45 +208,10 @@ int main(void)
         Error_Handler();
     }
 
-#elif LAB_MODE == 2
-
-    /* Deadlock용 Mutex 2개 */
-    mutexA = xSemaphoreCreateMutex();
-    mutexB = xSemaphoreCreateMutex();
-
-    if (mutexA == NULL || mutexB == NULL)
-    {
-        Error_Handler();
-    }
-
-#elif LAB_MODE == 3
-
-    /* Self-Deadlock용 일반 Mutex */
-    mutexA = xSemaphoreCreateMutex();
-
-    if (mutexA == NULL)
-    {
-        Error_Handler();
-    }
-
-#elif LAB_MODE == 4
-
-    /* Recursive Mutex 생성 */
-    recursiveMutex = xSemaphoreCreateRecursiveMutex();
-
-    if (recursiveMutex == NULL)
-    {
-        Error_Handler();
-    }
-
-#endif
-
     /* NumTask 함수 하나로 Task 9개 생성 */
     for (uint32_t i = 0; i < NUM_TASK_COUNT; i++)
     {
         UBaseType_t priority = 1;
-
-#if LAB_MODE == 1
 
         /* Task 1 Low / Task 2 Medium / Task 3 High */
         if (i == 1)
@@ -395,8 +222,6 @@ int main(void)
         {
             priority = 3;
         }
-
-#endif
 
         if (xTaskCreate(
                 StartNumTask,
