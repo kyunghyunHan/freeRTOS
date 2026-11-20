@@ -1,14 +1,70 @@
-/*
- * Mastering FreeRTOS - Chapter 3, Example 3: Experimenting with priorities
- * STM32F429ZI / NUCLEO-F429ZI / FreeRTOS V10.3.1 adaptation.
- * One standalone main.c-equivalent file. Do not compile all nine together.
- * UART: USART3 TX=PD8 AF7, 115200 8N1, APB1 clock assumed 16 MHz.
- * Use separately from CubeMX's generated main.c.
- */
+
 #include <stdint.h>
 #include <stddef.h>
 #include "FreeRTOS.h"
 #include "task.h"
+
+/*
+ * ============================================================
+ * Example 3 — Experimenting with Priorities
+ * STM32F429ZI / FreeRTOS
+ * ============================================================
+ *
+ * [1. 실습 목적]
+ *
+ * Example 1, 2에서는 두 Task의 Priority가 동일했다.
+ * Example 3에서는 Priority를 다르게 설정하여
+ * Scheduler의 Task 선택 순서를 확인한다.
+ *
+ * [2. Task 구성]
+ *
+ * Task 1 : Priority 1
+ *          문자열 출력 + Busy Loop
+ *
+ * Task 2 : Priority 2
+ *          문자열 출력 + Busy Loop
+ *
+ * 두 Task 모두 Blocking API를 사용하지 않는다.
+ *
+ * [3. 실행 순서]
+ *
+ * Task 1 : Priority 1, Ready
+ * Task 2 : Priority 2, Ready
+ *              |
+ *              v
+ *         Scheduler
+ *              |
+ *              v
+ *         Task 2 Running
+ *              |
+ *              v
+ *          문자열 출력
+ *              |
+ *              v
+ *           Busy Loop
+ *              |
+ *              v
+ *          계속 실행
+ *
+ * [4. Starvation — 기아 상태]
+ *
+ * Task 2는 높은 Priority를 가지며,
+ * Busy Loop 동안 Blocked 상태로 전환되지 않는다.
+ *
+ * 따라서 Task 1은 Ready 상태임에도
+ * CPU 실행 기회를 얻지 못한다.
+ *
+ * 이를 Starvation(기아 상태)이라고 한다.
+ *
+ * [5. 핵심]
+ *
+ * - Scheduler는 가장 높은 Priority의 Ready Task를 선택한다.
+ * - Busy Loop는 Task를 Blocked 상태로 만들지 않는다.
+ * - Tick이 발생해도 반드시 Task가 교체되는 것은 아니다.
+ * - 낮은 Priority Task는 Ready여도 실행되지 못할 수 있다.
+ *
+ * ============================================================
+ */
 
 #define REG32(addr) (*(volatile uint32_t *)(addr))
 #define RCC_AHB1ENR REG32(0x40023830UL)
@@ -36,9 +92,7 @@ static void uart_print(const char *s)
 {
     while (*s != '\0')
     {
-        /* Protect each TXE-check/DR-write pair from task preemption.
-         * Individual messages may still interleave when priorities match.
-         * This is a small educational UART, not a production logger. */
+     
         taskENTER_CRITICAL();
         while ((USART3_SR & (1UL << 7)) == 0U) { }
         USART3_DR = (uint8_t)*s++;
@@ -52,9 +106,9 @@ static void start_scheduler_or_halt(void)
     for (;;) { }
 }
 
-/* Example 3: Priority 2 continuously runs; Priority 1 starves.
- * Both tasks remain runnable; the busy loop never blocks.
- */
+/*
+동일한 Priority로 실행하던 두 Task 중 하나의 Priority를 높였을 때 Scheduler의 동작이 어떻게 달라지는지 확인하는 예제
+*/
 #define SPIN_COUNT 200000UL
 static const char msg1[] = "Task 1 priority 1\r\n";
 static const char msg2[] = "Task 2 priority 2\r\n";

@@ -1,10 +1,4 @@
-/*
- * Mastering FreeRTOS - Chapter 3, Example 2: Using the task parameter
- * STM32F429ZI / NUCLEO-F429ZI / FreeRTOS V10.3.1 adaptation.
- * One standalone main.c-equivalent file. Do not compile all nine together.
- * UART: USART3 TX=PD8 AF7, 115200 8N1, APB1 clock assumed 16 MHz.
- * Use separately from CubeMX's generated main.c.
- */
+
 #include <stdint.h>
 #include <stddef.h>
 #include "FreeRTOS.h"
@@ -36,9 +30,7 @@ static void uart_print(const char *s)
 {
     while (*s != '\0')
     {
-        /* Protect each TXE-check/DR-write pair from task preemption.
-         * Individual messages may still interleave when priorities match.
-         * This is a small educational UART, not a production logger. */
+    
         taskENTER_CRITICAL();
         while ((USART3_SR & (1UL << 7)) == 0U) { }
         USART3_DR = (uint8_t)*s++;
@@ -52,9 +44,19 @@ static void start_scheduler_or_halt(void)
     for (;;) { }
 }
 
-/* Example 2: two task INSTANCES share one function and code.
- * Parameters point at strings with static storage lifetime.
- */
+/*
+Example 2는 Example 1에서 사용한 두 개의 비슷한 Task 함수를 하나로 통합한다.
+두 Task의 함수 코드는 동일하지만 다음 요소는 독립적이다.
+
+- TCB
+- Stack
+- 실행 상태
+- 우선순위
+- 저장된 CPU Context
+같은 Task Function을 사용하더라도 서로 다른 `pvParameters`를 전달하면 각 Task Instance가 서로 다른 데이터를 사용할 수 있다.
+또한 각 Task는 전달받은 매개변수에 따라 서로 다른 문자열을 출력한다
+
+*/
 #define SPIN_COUNT 200000UL
 static const char msg1[] = "Task 1 is running\r\n";
 static const char msg2[] = "Task 2 is running\r\n";
