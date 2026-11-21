@@ -7,7 +7,7 @@
 #include <string.h>
 
 /* 0: Inversion (Binary Semaphore), 1: Inheritance (Mutex) */
-#define USE_MUTEX  1
+#define USE_MUTEX  0
 
 /* Task 설정: Stack 단위는 Word */
 #define NUM_TASK_COUNT  9U

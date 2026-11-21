@@ -7,7 +7,7 @@
 #include <string.h>
 
 /* 1: Deadlock / 2: Recursive Mutex */
-#define LAB_MODE 1
+#define LAB_MODE 2
 
 #define TASK_STACK 256U
 

@@ -1,148 +1,293 @@
-#include "ultrasonic.h"
-#include "stm32f4xx.h"
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
 
-/* 측정 상태 */
-#define US_IDLE       0U   /* 아무것도 안 함 */
-#define US_WAIT_RISE  1U   /* TRIG 보냄, ECHO 상승 에지 기다리는 중 */
-#define US_WAIT_FALL  2U   /* ECHO High 중, 하강 에지 기다리는 중 */
-#define US_DONE       3U   /* 측정 완료 */
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
-#define US_TIMEOUT_US 40000U   /* HC-SR04 는 물체 없으면 최대 약 38 ms High */
+/*
+ * STM32F429ZI - FreeRTOS
+ *
+ * NumTask 9개
+ * USART3 : 115200bps
+ *
+ * USE_UART_SEMAPHORE = 0
+ *   Binary Semaphore 없이 UART 출력
+ *   여러 Task의 문자열이 섞이는 현상 확인
+ *
+ * USE_UART_SEMAPHORE = 1
+ *   Binary Semaphore로 UART 출력 보호
+ *   문자열 단위로 출력되는지 확인
+ */
 
-static volatile uint8_t  us_state   = US_IDLE;
-static volatile uint32_t us_rise    = 0U;
-static volatile uint32_t us_echo_us = 0U;
+#define USE_UART_SEMAPHORE  0
 
-static void delay_us(uint32_t us)
+#define NUM_TASK_COUNT  9U
+#define NUM_TASK_STACK  384U
+
+/* UART */
+UART_HandleTypeDef huart3;
+
+/* Binary Semaphore */
+static SemaphoreHandle_t uartSemaphore = NULL;
+
+/* Task 번호 */
+static uint32_t numArguments[NUM_TASK_COUNT] =
 {
-    uint32_t start = TIM5->CNT;
-    while ((TIM5->CNT - start) < us) {
-    }
-}
+    1, 2, 3, 4, 5, 6, 7, 8, 9
+};
 
-void ULTRASONIC_Init(void)
+/* Task Handle */
+static TaskHandle_t numTaskHandles[NUM_TASK_COUNT] = {0};
+
+/* 함수 선언 */
+void SystemClock_Config(void);
+static void MX_USART3_UART_Init(void);
+static void StartNumTask(void *argument);
+static void UART_SendSlow(const char *message);
+
+/*
+ * UART 문자열 출력 함수
+ *
+ * 한 번에 1바이트씩 전송한다.
+ * 각 바이트 사이에 1 Tick Delay를 넣는다.
+ *
+ * Semaphore OFF:
+ *   여러 Task의 출력이 섞일 수 있다.
+ *
+ * Semaphore ON:
+ *   한 Task가 문자열 출력 전체를 완료한 뒤
+ *   다른 Task가 출력하도록 보호한다.
+ */
+static void UART_SendSlow(const char *message)
 {
-    /* GPIOA, GPIOF, TIM5 클럭 공급 */
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN
-                  | RCC_AHB1ENR_GPIOFEN;
-    RCC->APB1ENR |= RCC_APB1ENR_TIM5EN;
-    (void)RCC->AHB1ENR;
-    (void)RCC->APB1ENR;
+#if USE_UART_SEMAPHORE == 1
 
-    /* PF12 (TRIG): 일반 출력 모드(01), Push-pull, 초기 Low */
-    GPIOF->MODER &= ~(3U << 24);
-    GPIOF->MODER |=  (1U << 24);
-    GPIOF->OTYPER &= ~(1U << 12);
-    GPIOF->PUPDR &= ~(3U << 24);
-    GPIOF->BSRR = (1U << (12 + 16));
-
-    /* PA0 (ECHO): AF 모드(10), AF2 = TIM5_CH1 */
-    GPIOA->MODER &= ~(3U << 0);
-    GPIOA->MODER |=  (2U << 0);
-    GPIOA->PUPDR &= ~(3U << 0);
-    GPIOA->AFR[0] &= ~(0xFU << 0);
-    GPIOA->AFR[0] |=  (2U << 0);
-
-    /* 설정하는 동안 카운터와 인터럽트 정지 */
-    TIM5->CR1  = 0U;
-    TIM5->DIER = 0U;
-
-    /* APB1 = 42 MHz, 분주 있으므로 타이머 클럭 = 84 MHz -> 84분주 = 1 MHz (1칸 = 1 us) */
-    TIM5->PSC = 84U - 1U;
-    TIM5->ARR = 0xFFFFFFFFU;           /* TIM5 는 32비트: 최대로 두고 계속 돌림 */
-
-    /* CH1 입력 캡처: CC1S = 01 (TI1 입력), IC1F = 0011 (짧은 노이즈 필터) */
-    TIM5->CCMR1 &= ~(0xFFU << 0);
-    TIM5->CCMR1 |=  (1U << 0) | (3U << 4);
-
-    /* CC1P = 1, CC1NP = 1 : 상승/하강 양쪽 에지 캡처, CC1E = 1 : 캡처 허용 */
-    TIM5->CCER &= ~(0xFU << 0);
-    TIM5->CCER |=  (1U << 1) | (1U << 3) | (1U << 0);
-
-    /* UG: 분주값 적용 및 카운터 초기화 후 플래그 제거 */
-    TIM5->EGR = (1U << 0);
-    TIM5->SR  = 0U;
-
-    /* CC1IE = 1 : 채널1 캡처 인터럽트 허용 */
-    TIM5->DIER |= (1U << 1);
-
-    NVIC_ClearPendingIRQ(TIM5_IRQn);
-    NVIC_EnableIRQ(TIM5_IRQn);
-
-    /* CEN: 카운터 시작 */
-    TIM5->CR1 |= (1U << 0);
-}
-
-void ULTRASONIC_Start(void)
-{
-    us_state = US_WAIT_RISE;
-
-    /* TRIG High 10 us 이상 -> Low */
-    GPIOF->BSRR = (1U << 12);
-    delay_us(12U);
-    GPIOF->BSRR = (1U << (12 + 16));
-}
-
-uint8_t ULTRASONIC_IsDone(void)
-{
-    return (us_state == US_DONE) ? 1U : 0U;
-}
-
-uint32_t ULTRASONIC_GetEchoUs(void)
-{
-    return us_echo_us;
-}
-
-uint32_t ULTRASONIC_GetCm(void)
-{
-    /* 음속 340 m/s 기준 왕복: 거리(cm) = 시간(us) / 58 */
-    return us_echo_us / 58U;
-}
-
-uint32_t ULTRASONIC_GetMm(void)
-{
-    return (us_echo_us * 10U) / 58U;
-}
-
-uint32_t ULTRASONIC_MeasureCm(void)
-{
-    ULTRASONIC_Start();
-
-    uint32_t start = TIM5->CNT;
-    while (us_state != US_DONE) {
-        if ((TIM5->CNT - start) > US_TIMEOUT_US) {
-            us_state = US_IDLE;
-            return ULTRASONIC_ERROR;
-        }
-    }
-    return ULTRASONIC_GetCm();
-}
-
-void TIM5_IRQHandler(void)
-{
-    /* 채널1 캡처 발생? */
-    if ((TIM5->SR & (1U << 1)) != 0U)
+    /* Binary Semaphore 획득 */
+    if (xSemaphoreTake(
+            uartSemaphore,
+            portMAX_DELAY) != pdTRUE)
     {
-        /* CCR1 읽으면 CC1IF 자동 해제 */
-        uint32_t cap = TIM5->CCR1;
+        return;
+    }
 
-        /* 지금 핀 레벨로 상승/하강 구분 */
-        if ((GPIOA->IDR & (1U << 0)) != 0U)
+#endif
+
+    while (*message != '\0')
+    {
+        uint8_t ch = (uint8_t)*message++;
+
+        /* UART 1바이트 전송 */
+        HAL_UART_Transmit(
+            &huart3,
+            &ch,
+            1,
+            100
+        );
+
+        /*
+         * Task를 Blocked 상태로 전환하여
+         * 다른 Task가 실행될 기회를 제공
+         */
+        vTaskDelay(1);
+    }
+
+#if USE_UART_SEMAPHORE == 1
+
+    /* 문자열 출력 완료 후 Semaphore 반환 */
+    xSemaphoreGive(uartSemaphore);
+
+#endif
+}
+
+/*
+ * NumTask 1~9
+ *
+ * 모든 Task는 동일한 함수를 실행하고,
+ * 전달받은 argument로 번호를 구분한다.
+ */
+static void StartNumTask(void *argument)
+{
+    uint32_t id = *(uint32_t *)argument;
+
+    char message[80];
+
+    uint32_t count = 0;
+
+    for (;;)
+    {
+        count++;
+
+        snprintf(
+            message,
+            sizeof(message),
+            "[%lu] NumTask Running - Count: %lu\r\n",
+            (unsigned long)id,
+            (unsigned long)count
+        );
+
+        /* 공유 UART로 출력 */
+        UART_SendSlow(message);
+
+        /* 다음 반복까지 100ms 대기 */
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+/* main */
+int main(void)
+{
+    HAL_Init();
+
+    SystemClock_Config();
+
+    MX_USART3_UART_Init();
+
+    /*
+     * FreeRTOS Scheduler 시작 전
+     * UART 통신이 정상적인지 확인
+     */
+    const char testMessage[] =
+        "\r\nUART TEST 123456789\r\n";
+
+    HAL_UART_Transmit(
+        &huart3,
+        (uint8_t *)testMessage,
+        sizeof(testMessage) - 1U,
+        1000
+    );
+
+#if USE_UART_SEMAPHORE == 1
+
+    /* Binary Semaphore 생성 */
+    uartSemaphore = xSemaphoreCreateBinary();
+
+    if (uartSemaphore == NULL)
+    {
+        Error_Handler();
+    }
+
+    /*
+     * Binary Semaphore 초기 Count = 0
+     * 첫 Task가 획득할 수 있도록 Count = 1
+     */
+    if (xSemaphoreGive(uartSemaphore) != pdTRUE)
+    {
+        Error_Handler();
+    }
+
+#endif
+
+    /* NumTask 9개 생성 */
+    for (uint32_t i = 0; i < NUM_TASK_COUNT; i++)
+    {
+        if (xTaskCreate(
+                StartNumTask,
+                "NumTask",
+                NUM_TASK_STACK,
+                &numArguments[i],
+                1,
+                &numTaskHandles[i]) != pdPASS)
         {
-            if (us_state == US_WAIT_RISE) {
-                us_rise  = cap;
-                us_state = US_WAIT_FALL;
-            }
-        }
-        else
-        {
-            if (us_state == US_WAIT_FALL) {
-                us_echo_us = cap - us_rise;   /* 32비트라 넘침도 뺄셈으로 처리됨 */
-                us_state   = US_DONE;
-            }
+            Error_Handler();
         }
     }
 
-    /* 오버캡처 플래그(CC1OF, bit9) 정리: SR 은 0 을 쓴 비트만 지워짐 */
-    TIM5->SR = ~(1U << 9);
+    /* FreeRTOS Scheduler 시작 */
+    vTaskStartScheduler();
+
+    /* Scheduler 시작에 실패하면 실행 */
+    Error_Handler();
+
+    while (1)
+    {
+    }
+}
+
+/* System Clock: 168MHz */
+void SystemClock_Config(void)
+{
+    RCC_OscInitTypeDef osc = {0};
+    RCC_ClkInitTypeDef clk = {0};
+
+    __HAL_RCC_PWR_CLK_ENABLE();
+
+    __HAL_PWR_VOLTAGESCALING_CONFIG(
+        PWR_REGULATOR_VOLTAGE_SCALE1
+    );
+
+    osc.OscillatorType =
+        RCC_OSCILLATORTYPE_HSE |
+        RCC_OSCILLATORTYPE_LSI;
+
+    osc.HSEState = RCC_HSE_BYPASS;
+    osc.LSIState = RCC_LSI_ON;
+
+    osc.PLL.PLLState = RCC_PLL_ON;
+    osc.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+
+    /*
+     * PLL 설정 수정
+     *
+     * HSE BYPASS = 8MHz 가정
+     * 8 / 4 * 168 / 2 = 168MHz
+     */
+    osc.PLL.PLLM = 4;
+    osc.PLL.PLLN = 168;
+    osc.PLL.PLLP = RCC_PLLP_DIV2;
+    osc.PLL.PLLQ = 7;
+
+    if (HAL_RCC_OscConfig(&osc) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    clk.ClockType =
+        RCC_CLOCKTYPE_HCLK |
+        RCC_CLOCKTYPE_SYSCLK |
+        RCC_CLOCKTYPE_PCLK1 |
+        RCC_CLOCKTYPE_PCLK2;
+
+    clk.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+    clk.AHBCLKDivider = RCC_SYSCLK_DIV1;
+    clk.APB1CLKDivider = RCC_HCLK_DIV4;
+    clk.APB2CLKDivider = RCC_HCLK_DIV2;
+
+    if (HAL_RCC_ClockConfig(
+            &clk,
+            FLASH_LATENCY_5) != HAL_OK)
+    {
+        Error_Handler();
+    }
+}
+
+/* USART3: 115200bps */
+static void MX_USART3_UART_Init(void)
+{
+    huart3.Instance = USART3;
+
+    huart3.Init.BaudRate = 115200;
+    huart3.Init.WordLength = UART_WORDLENGTH_8B;
+    huart3.Init.StopBits = UART_STOPBITS_1;
+    huart3.Init.Parity = UART_PARITY_NONE;
+    huart3.Init.Mode = UART_MODE_TX_RX;
+    huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+
+    if (HAL_UART_Init(&huart3) != HAL_OK)
+    {
+        Error_Handler();
+    }
+}
+
+/* 오류 처리 */
+void Error_Handler(void)
+{
+    __disable_irq();
+
+    while (1)
+    {
+    }
 }
