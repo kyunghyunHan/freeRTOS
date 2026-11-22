@@ -1,0 +1,12 @@
+/* Paste into CubeMX-generated main.c USER CODE sections. */
+#include "example_bsp.h"
+
+/* After HAL_Init(), SystemClock_Config(), MX_GPIO_Init(),
+   MX_USART3_UART_Init(), and BEFORE vTaskStartScheduler(): */
+example_start();
+vTaskStartScheduler();
+
+/* For EXTI examples, call example_button_irq() from HAL_GPIO_EXTI_Callback.
+   Ensure only one HAL_GPIO_EXTI_Callback definition.
+   CubeMX CMSIS-RTOS projects typically call osKernelStart(), which starts the
+   scheduler; call example_start() before osKernelStart(). Do not start twice. */

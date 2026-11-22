@@ -1,0 +1,37 @@
+/* STM32F429ZI / FreeRTOS native API learning example.
+ * This file is a standalone EXAMPLE MODULE, not a complete CubeMX project.
+ * Build EXACTLY ONE exampleXX.c per application.
+ * BSP: example_bsp.c; call example_start() before vTaskStartScheduler().
+ * English API names match the 2016 tutorial; examples are new adaptations.
+ */
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+#include "semphr.h"
+#include "timers.h"
+#include "event_groups.h"
+#include "example_bsp.h"
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+/* Chapter 6 — Example 17: Counting semaphore from an ISR */
+static SemaphoreHandle_t sem;
+static void worker(void *arg) {
+    (void)arg;
+    for (;;) {
+        if (xSemaphoreTake(sem,portMAX_DELAY)==pdTRUE) {
+            ex_log("Processed counted IRQ event\r\n");
+            vTaskDelay(pdMS_TO_TICKS(200));
+        }
+    }
+}
+void example_button_irq(void) {
+    BaseType_t woken=pdFALSE;
+    if (sem) (void)xSemaphoreGiveFromISR(sem,&woken);
+    portYIELD_FROM_ISR(woken);
+}
+void example_start(void) {
+    sem=xSemaphoreCreateCounting(10,0); configASSERT(sem);
+    configASSERT(xTaskCreate(worker,"worker",256,NULL,2,NULL)==pdPASS);
+}
