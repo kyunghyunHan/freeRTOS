@@ -1,4 +1,7 @@
-# FreeRTOS C / Rust 실습 — NUCLEO-F446RE
+# FreeRTOS C / Rust 실습 — NUCLEO-F446RE / F429ZI
+
+**F429ZI Chapter 3~9 학습 예제:** [독립 실행 예제 01~25 및 CubeIDE 실행 안내](example/README.md).
+HAL/BSP 없이 레지스터 직접 제어와 FreeRTOS Native API를 사용합니다.
 
 macOS Apple Silicon / STM32 NUCLEO-F446RE / 내장 ST-LINK.
 C는 CMake와 Ninja, F429ZI용 Rust 예제는 Cargo로 최종 펌웨어를 빌드합니다.
