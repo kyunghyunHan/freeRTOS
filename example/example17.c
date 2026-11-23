@@ -1,171 +1,475 @@
-/* NUCLEO-F429ZI / STM32F429xx / FreeRTOS Native API
- * 독립 실행: 이 파일 하나를 main.c로 사용한다. 다른 exampleXX.c와 동시 링크 금지.
- * 태스크 stack=512 words(2048 bytes), priority는 각 xTaskCreate 인수 참조.
- * 1. worker(2)가 counting semaphore에서 기다린다(최대10).
- * 2. IRQ마다 count가 증가하고 worker는 200ms 간격으로 하나씩 소비한다. 가득 차면 이벤트가 유실된다.
- * 공통 실행 조건: preemption=1, time slicing=1, tick=1ms.
- * 같은 priority의 Ready 태스크는 tick마다 교대 가능, Blocked 태스크는 대상에서 제외.
- */
+
 #include "FreeRTOS.h"
 #include "task.h"
-#include "queue.h"
 #include "semphr.h"
-#include "timers.h"
-#include "event_groups.h"
 #include "stm32f4xx.h"
 #include <stdint.h>
-#include <stdio.h>
 
-/* 이 파일 안에서만 쓰는 UART 출력: 별도 BSP/표준 입출력 retarget 불필요.
- * USART3=0x40004800, SR(+0x00)의 TXE(bit7), DR(+0x04).
- * TXE 검사와 DR 기록만 critical section으로 보호한다. 대기는 밖에서 한다.
- * 메시지 전체를 잠그지 않으므로 태스크 간 문자열은 섞일 수 있다.
- * Example20은 mutex, Example21은 gatekeeper로 메시지 단위 보호를 학습한다.
- * ISR에서는 호출 금지. Timer callback의 폴링 시간만큼 daemon 처리가 늦어진다.
- */
+/*
+STM32F429ZI - FreeRTOS Chapter 6 Example 17
+
+Counting Semaphore를 이용한 ISR과 Task 동기화
+
+USART3 : PD8 TX / PD9 RX
+Baud   : 115200
+LED    : PB0
+
+Periodic Task : Priority 1
+Handler Task  : Priority 3
+
+동작 순서
+
+① Counting Semaphore 생성 (Max=10, Initial=0)
+② Handler Task / Periodic Task 생성
+③ Scheduler 시작
+④ Handler Task → Take(0) → BLOCKED
+⑤ Periodic Task → 500ms 대기
+⑥ 소프트웨어 인터럽트 발생
+⑦ ISR → GiveFromISR() 3회
+⑧ Handler Task BLOCKED → READY
+⑨ PendSV → Handler Task RUNNING
+⑩ Handler Task → Take 3회 → 이벤트 3개 처리
+⑪ Handler Task 다시 BLOCKED
+⑫ Periodic Task 실행 재개
+⑬ 500ms마다 반복
+
+소프트웨어 인터럽트는 HASH_RNG_IRQn을 이용한다.
+
+HASH/RNG 주변장치 자체는 사용하지 않는다.
+이 IRQ가 다른 코드에서 사용되지 않아야 한다.
+*/
+
+static SemaphoreHandle_t countingSemaphore = NULL;
+void Trace_OnSwitchIn(void *tcb)
+{
+    (void)tcb;
+}
+
+/*
+UART 문자열 출력
+
+USART3 TXE 확인 후 한 글자씩 전송한다.
+ISR에서는 호출하지 않는다.
+*/
 static void uart_write(const char *text)
 {
     while (*text != '\0')
     {
         taskENTER_CRITICAL();
+
         if ((USART3->SR & USART_SR_TXE) != 0U)
         {
             USART3->DR = (uint8_t)*text++;
         }
+
         taskEXIT_CRITICAL();
     }
 }
 
-/* assert 식은 검사만 수행한다. 실패 위치는 debugger에서 확인한다. */
-volatile const char *failure_file;
-volatile int failure_line;
-void firmware_assert(const char *file, int line)
+
+/*
+오류 발생 시 PB14 LED ON
+*/
+static void firmware_error(void)
 {
     __disable_irq();
-    failure_file = file;
-    failure_line = line;
-    GPIOB->BSRR = (1U << 14); /* LD3 빨강; 오류 처리 중 UART/heap 사용 금지 */
+
+    GPIOB->BSRR = (1U << 14);
+
     for (;;)
     {
         __NOP();
     }
 }
-void vApplicationMallocFailedHook(void) { firmware_assert(__FILE__, __LINE__); }
-void vApplicationStackOverflowHook(TaskHandle_t task, char *name)
-{
-    (void)task;
-    (void)name;
-    firmware_assert(__FILE__, __LINE__);
-}
 
+
+/*
+HSI 16MHz
+GPIOB LED
+USART3 초기화
+*/
 static void hardware_init(void)
 {
-    /* 1. RCC=0x40023800. 외부 크리스털/ST-LINK MCO에 의존하지 않는 HSI 16MHz.
-     * SYSCLK=HCLK=PCLK1=PCLK2=16MHz. scheduler 시작 후에는 클록 변경 금지.
-     */
+    /*
+    HSI 16MHz 설정
+    */
+
     RCC->CR |= RCC_CR_HSION;
+
     while ((RCC->CR & RCC_CR_HSIRDY) == 0U)
     {
     }
+
     RCC->CFGR &= ~RCC_CFGR_SW;
-    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_HSI)
+
+    while ((RCC->CFGR & RCC_CFGR_SWS)
+           != RCC_CFGR_SWS_HSI)
     {
     }
-    RCC->CFGR &= ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2);
+
+    RCC->CFGR &= ~(
+        RCC_CFGR_HPRE |
+        RCC_CFGR_PPRE1 |
+        RCC_CFGR_PPRE2
+    );
+
     SystemCoreClockUpdate();
-    SCB->VTOR = FLASH_BASE; /* 기존 startup 벡터: 0x08000000, bootloader 없음 */
+
+    SCB->VTOR = FLASH_BASE;
+
     __DSB();
     __ISB();
-    NVIC_SetPriorityGrouping(0U); /* 4비트 모두 선점 우선순위 */
 
-    /* 2. AHB1ENR(+0x30): GPIOB/C/D 클록, read-back으로 전파 대기.
-     * GPIOB=0x40020400: MODER(+0), OTYPER(+4), PUPDR(+0x0c),
-     * ODR(+0x14), BSRR(+0x18): 하위16 set / 상위16 reset.
-     */
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN | RCC_AHB1ENR_GPIODEN;
+    NVIC_SetPriorityGrouping(0U);
+
+
+    /*
+    GPIOB / GPIOD Clock Enable
+    */
+
+    RCC->AHB1ENR |=
+        RCC_AHB1ENR_GPIOBEN |
+        RCC_AHB1ENR_GPIODEN;
+
     (void)RCC->AHB1ENR;
-    GPIOB->BSRR = ((1U << 0) | (1U << 7) | (1U << 14)) << 16;
-    GPIOB->MODER = (GPIOB->MODER & ~((3U << 0) | (3U << 14) | (3U << 28))) | (1U << 0) |
-                   (1U << 14) | (1U << 28);
-    GPIOB->OTYPER &= ~((1U << 0) | (1U << 7) | (1U << 14));
-    GPIOB->PUPDR &= ~((3U << 0) | (3U << 14) | (3U << 28));
-    GPIOC->MODER &= ~(3U << 26); /* PC13 입력: 버튼 눌림=1 */
-    GPIOC->PUPDR = (GPIOC->PUPDR & ~(3U << 26)) | (2U << 26);
 
-    /* 3. PD8 TX, PD9 RX: MODER=10(AF), AFRH AF7, push-pull, RX pull-up. */
-    GPIOD->MODER = (GPIOD->MODER & ~((3U << 16) | (3U << 18))) | (2U << 16) | (2U << 18);
-    GPIOD->AFR[1] = (GPIOD->AFR[1] & ~0xffU) | 0x77U;
-    GPIOD->OTYPER &= ~((1U << 8) | (1U << 9));
-    GPIOD->OSPEEDR = (GPIOD->OSPEEDR & ~((3U << 16) | (3U << 18))) | (2U << 16) | (2U << 18);
-    GPIOD->PUPDR = (GPIOD->PUPDR & ~((3U << 16) | (3U << 18))) | (1U << 18);
+
+    /*
+    PB0 LED 출력
+    PB14 오류 LED 출력
+    */
+
+    GPIOB->BSRR =
+        ((1U << 0) | (1U << 14)) << 16;
+
+    GPIOB->MODER =
+        (GPIOB->MODER &
+         ~((3U << 0) | (3U << 28))) |
+        (1U << 0) |
+        (1U << 28);
+
+    GPIOB->OTYPER &=
+        ~((1U << 0) | (1U << 14));
+
+    GPIOB->PUPDR &=
+        ~((3U << 0) | (3U << 28));
+
+
+    /*
+    USART3 GPIO 설정
+
+    PD8 = TX
+    PD9 = RX
+    Alternate Function 7
+    */
+
+    GPIOD->MODER =
+        (GPIOD->MODER &
+         ~((3U << 16) | (3U << 18))) |
+        (2U << 16) |
+        (2U << 18);
+
+    GPIOD->AFR[1] =
+        (GPIOD->AFR[1] & ~0xFFU) |
+        0x77U;
+
+    GPIOD->OTYPER &=
+        ~((1U << 8) | (1U << 9));
+
+    GPIOD->PUPDR =
+        (GPIOD->PUPDR &
+         ~((3U << 16) | (3U << 18))) |
+        (1U << 18);
+
+
+    /*
+    USART3 115200, 8N1
+    */
+
     RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
+
     (void)RCC->APB1ENR;
+
     USART3->CR1 = 0U;
     USART3->CR2 = 0U;
     USART3->CR3 = 0U;
-    /* OVER8=0: BRR=round(PCLK1/115200)=139=0x008b.
-     * 실제 115107.9 baud(-0.08%, HSI 자체 오차 제외), 8 data/no parity/1 stop.
-     * RX는 활성화하지만 이 예제들은 송신만 사용한다(RXNE IRQ 없음).
-     */
-    USART3->BRR = (16000000U + 115200U / 2U) / 115200U;
-    USART3->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;
+
+    USART3->BRR =
+        (16000000U + 115200U / 2U) /
+        115200U;
+
+    USART3->CR1 =
+        USART_CR1_UE |
+        USART_CR1_TE |
+        USART_CR1_RE;
 }
 
-/* Chapter 6 — Example 17: Counting semaphore from an ISR */
-static SemaphoreHandle_t sem;
-static void worker(void *arg)
+
+/*
+Handler Task
+
+Priority = 3
+
+Counting Semaphore가 0이면 BLOCKED
+
+ISR에서 Give하면 깨어나고
+누적된 이벤트를 하나씩 처리한다.
+*/
+static void HandlerTask(void *argument)
 {
-    (void)arg;
+    (void)argument;
+
     for (;;)
     {
-        if (xSemaphoreTake(sem, portMAX_DELAY) == pdTRUE)
+        /*
+        Count = 0
+
+        Handler Task
+        RUNNING → BLOCKED
+
+        Count가 증가하면
+        BLOCKED → READY
+        */
+
+        if (xSemaphoreTake(
+                countingSemaphore,
+                portMAX_DELAY) == pdTRUE)
         {
-            uart_write("Processed counted IRQ event\r\n");
-            vTaskDelay(pdMS_TO_TICKS(200));
+            /*
+            Take 성공
+
+            이벤트 1개 소비
+
+            남은 Count가 있으면
+            다음 Take는 즉시 성공한다.
+            */
+
+            GPIOB->ODR ^= (1U << 0);
+
+            uart_write(
+                "Handler task - Processing event.\r\n"
+            );
         }
     }
 }
-void EXTI15_10_IRQHandler(void)
+
+
+/*
+Periodic Task
+
+Priority = 1
+
+500ms마다 소프트웨어 인터럽트를 발생시킨다.
+*/
+static void PeriodicTask(void *argument)
 {
-    if ((EXTI->PR & EXTI_PR_PR13) == 0U)
-        return;
-    EXTI->PR = EXTI_PR_PR13; /* 해당 라인만 W1C */
-    /* scheduler 전 버튼 입력은 버린다: 초기화 중 FromISR 호출 방지. */
-    if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING)
-        return;
-    BaseType_t woken = pdFALSE;
-    if (sem)
-        (void)xSemaphoreGiveFromISR(sem, &woken);
-    portYIELD_FROM_ISR(woken);
+    const TickType_t delay500ms =
+        pdMS_TO_TICKS(500);
+
+    (void)argument;
+
+    for (;;)
+    {
+        /*
+        500ms 대기
+        */
+
+        vTaskDelay(delay500ms);
+
+
+        /*
+        소프트웨어 인터럽트 발생 직전
+        */
+
+        uart_write(
+            "Periodic task - About to generate an interrupt.\r\n"
+        );
+
+
+        /*
+        NVIC Pending Bit 설정
+
+        HASH_RNG_IRQHandler() 실행
+        */
+
+        NVIC_SetPendingIRQ(HASH_RNG_IRQn);
+
+
+        /*
+        Handler Task가 높은 우선순위이므로
+        일반적인 실행에서는
+        이벤트 3개 처리 후 이 메시지가 출력된다.
+        */
+
+        uart_write(
+            "Periodic task - Interrupt generated.\r\n\r\n"
+        );
+    }
 }
+
+
+/*
+소프트웨어 인터럽트 ISR
+
+교재 Example 17의 핵심
+
+인터럽트 1회 발생 시
+Semaphore Give를 3회 실행한다.
+*/
+void HASH_RNG_IRQHandler(void)
+{
+    BaseType_t xHigherPriorityTaskWoken =
+        pdFALSE;
+
+    /*
+    Counting Semaphore Give ①
+
+    대기 중인 Handler Task가 있으면
+    BLOCKED → READY
+    */
+
+    (void)xSemaphoreGiveFromISR(
+        countingSemaphore,
+        &xHigherPriorityTaskWoken
+    );
+
+
+    /*
+    Counting Semaphore Give ②
+
+    추가 이벤트 1개 누적
+    */
+
+    (void)xSemaphoreGiveFromISR(
+        countingSemaphore,
+        &xHigherPriorityTaskWoken
+    );
+
+
+    /*
+    Counting Semaphore Give ③
+
+    추가 이벤트 1개 누적
+    */
+
+    (void)xSemaphoreGiveFromISR(
+        countingSemaphore,
+        &xHigherPriorityTaskWoken
+    );
+
+
+    /*
+    더 높은 우선순위 Task가 깨어났다면
+    PendSV를 통한 Context Switching 요청
+    */
+
+    portYIELD_FROM_ISR(
+        xHigherPriorityTaskWoken
+    );
+}
+
+
+/*
+main
+
+Semaphore 생성
+Task 생성
+IRQ 설정
+Scheduler 시작
+*/
 int main(void)
 {
     hardware_init();
-    sem = xSemaphoreCreateCounting(10, 0);
-    configASSERT(sem);
-    {
-        BaseType_t result0 = xTaskCreate(worker, "worker", 512, NULL, 2, NULL);
-        if (result0 != pdPASS)
-            firmware_assert(__FILE__, __LINE__);
-    }
-    /* SYSCFG=0x40013800, EXTICR4(+0x14)[7:4]=2: EXTI13 <- PC13.
-     * EXTI=0x40013c00, PR(+0x14)은 write-one-to-clear, |= 사용 금지.
-     */
-    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-    (void)RCC->APB2ENR;
-    SYSCFG->EXTICR[3] = (SYSCFG->EXTICR[3] & ~(15U << 4)) | (2U << 4);
-    EXTI->IMR &= ~EXTI_IMR_MR13;
-    EXTI->RTSR |= EXTI_RTSR_TR13;
-    EXTI->FTSR &= ~EXTI_FTSR_TR13;
-    EXTI->PR = EXTI_PR_PR13;
-    NVIC_ClearPendingIRQ(EXTI15_10_IRQn);
-    /* 숫자가 작을수록 높은 IRQ 우선순위. FromISR 허용 범위=5..15, 여기서는 6. */
-    NVIC_SetPriority(EXTI15_10_IRQn, 6U);
-    EXTI->IMR |= EXTI_IMR_MR13;
-    NVIC_EnableIRQ(EXTI15_10_IRQn);
 
-    /* 마지막 단계: 포트가 SVC로 첫 태스크를 시작하고 SysTick/PendSV를 관리한다. */
+
+    /*
+    ① Counting Semaphore 생성
+
+    Max Count     = 10
+    Initial Count = 0
+
+    최대 10개의 이벤트를 누적할 수 있다.
+    */
+
+    countingSemaphore =
+        xSemaphoreCreateCounting(10, 0);
+
+    if (countingSemaphore == NULL)
+    {
+        firmware_error();
+    }
+
+
+    /*
+    ② Handler Task 생성
+
+    Priority = 3
+    Stack = 512 words
+    */
+
+    if (xTaskCreate(
+            HandlerTask,
+            "Handler",
+            512,
+            NULL,
+            3,
+            NULL) != pdPASS)
+    {
+        firmware_error();
+    }
+
+
+    /*
+    ③ Periodic Task 생성
+
+    Priority = 1
+    Stack = 512 words
+    */
+
+    if (xTaskCreate(
+            PeriodicTask,
+            "Periodic",
+            512,
+            NULL,
+            1,
+            NULL) != pdPASS)
+    {
+        firmware_error();
+    }
+
+
+    /*
+    ④ 소프트웨어 인터럽트 설정
+
+    IRQ Priority = 6
+    */
+
+    NVIC_DisableIRQ(HASH_RNG_IRQn);
+
+    NVIC_ClearPendingIRQ(HASH_RNG_IRQn);
+
+    NVIC_SetPriority(
+        HASH_RNG_IRQn,
+        6U
+    );
+
+    NVIC_EnableIRQ(HASH_RNG_IRQn);
+
+
+    /*
+    ⑤ FreeRTOS Scheduler 시작
+
+    Handler Task 먼저 실행
+
+    Take(0) → BLOCKED
+
+    이후 Periodic Task가
+    500ms마다 인터럽트를 발생시킨다.
+    */
+
     vTaskStartScheduler();
-    firmware_assert(__FILE__, __LINE__); /* heap 부족 등 scheduler 반환은 오류 */
+
+    firmware_error();
+
     return 0;
 }

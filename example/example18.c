@@ -1,157 +1,504 @@
-/* NUCLEO-F429ZI / STM32F429xx / FreeRTOS Native API
- * 독립 실행: 이 파일 하나를 main.c로 사용한다. 다른 exampleXX.c와 동시 링크 금지.
- * 태스크 stack=512 words(2048 bytes), priority는 각 xTaskCreate 인수 참조.
- * 1. 별도 worker 없이 PC13 IRQ에서 deferred 함수를 timer queue로 보낸다.
- * 2. PendSV 후 daemon(4)이 일반 태스크 문맥에서 deferred를 실행한다.
- * 공통 실행 조건: preemption=1, time slicing=1, tick=1ms.
- * 같은 priority의 Ready 태스크는 tick마다 교대 가능, Blocked 태스크는 대상에서 제외.
- */
+
 #include "FreeRTOS.h"
 #include "task.h"
-#include "queue.h"
-#include "semphr.h"
 #include "timers.h"
-#include "event_groups.h"
 #include "stm32f4xx.h"
 #include <stdint.h>
-#include <stdio.h>
 
-/* 이 파일 안에서만 쓰는 UART 출력: 별도 BSP/표준 입출력 retarget 불필요.
- * USART3=0x40004800, SR(+0x00)의 TXE(bit7), DR(+0x04).
- * TXE 검사와 DR 기록만 critical section으로 보호한다. 대기는 밖에서 한다.
- * 메시지 전체를 잠그지 않으므로 태스크 간 문자열은 섞일 수 있다.
- * Example20은 mutex, Example21은 gatekeeper로 메시지 단위 보호를 학습한다.
- * ISR에서는 호출 금지. Timer callback의 폴링 시간만큼 daemon 처리가 늦어진다.
- */
+/*
+STM32F429ZI - FreeRTOS Chapter 6 Example 18
+
+Centralized Deferred Interrupt Processing
+
+USART3 : PD8 TX / PD9 RX
+Baud   : 115200
+LED    : PB0
+
+Periodic Task : Priority 3
+Daemon Task   : Priority 4
+
+동작 순서
+
+① 하드웨어 초기화
+② Periodic Task 생성
+③ 소프트웨어 IRQ 설정
+④ Scheduler 시작
+⑤ Daemon Task → Timer Queue 대기
+⑥ Periodic Task → 500ms 대기
+⑦ Periodic Task → 소프트웨어 IRQ 발생
+⑧ ISR → xTimerPendFunctionCallFromISR()
+⑨ Timer Command Queue에 실행 요청 저장
+⑩ Daemon Task BLOCKED → READY
+⑪ PendSV → Daemon Task RUNNING
+⑫ Deferred 함수 실행 및 이벤트 번호 출력
+⑬ Daemon Task 다시 대기
+⑭ Periodic Task 실행 재개
+⑮ 500ms마다 반복
+
+별도 Handler Task 없음
+Binary / Counting Semaphore 없음
+
+소프트웨어 인터럽트는 HASH_RNG_IRQn 사용
+HASH/RNG 주변장치 자체는 사용하지 않음
+*/
+
+static volatile uint32_t deferredErrorCount = 0;
+
+/*
+FreeRTOSConfig.h에 Trace Hook이
+활성화된 경우를 위한 함수
+
+Trace 분석은 수행하지 않는다.
+*/
+void Trace_OnSwitchIn(void *tcb)
+{
+    (void)tcb;
+}
+void vApplicationGetTimerTaskMemory(
+    StaticTask_t **ppxTimerTaskTCBBuffer,
+    StackType_t **ppxTimerTaskStackBuffer,
+    uint32_t *pulTimerTaskStackSize)
+{
+    static StaticTask_t timerTaskTCB;
+
+    static StackType_t timerTaskStack[configTIMER_TASK_STACK_DEPTH];
+
+    *ppxTimerTaskTCBBuffer = &timerTaskTCB;
+
+    *ppxTimerTaskStackBuffer = timerTaskStack;
+
+    *pulTimerTaskStackSize =
+        configTIMER_TASK_STACK_DEPTH;
+}
+
+/*
+UART 문자열 출력
+
+USART3 TXE 확인
+한 글자씩 전송
+
+ISR에서는 호출하지 않는다.
+*/
 static void uart_write(const char *text)
 {
     while (*text != '\0')
     {
+        while ((USART3->SR & USART_SR_TXE) == 0U)
+        {
+        }
+
         taskENTER_CRITICAL();
+
         if ((USART3->SR & USART_SR_TXE) != 0U)
         {
             USART3->DR = (uint8_t)*text++;
         }
+
         taskEXIT_CRITICAL();
     }
 }
 
-/* assert 식은 검사만 수행한다. 실패 위치는 debugger에서 확인한다. */
-volatile const char *failure_file;
-volatile int failure_line;
-void firmware_assert(const char *file, int line)
+/*
+32비트 정수를 문자열로 변환하여 출력
+*/
+static void uart_write_number(uint32_t value)
+{
+    char buffer[11];
+    uint32_t index = 0;
+
+    if (value == 0U)
+    {
+        uart_write("0");
+        return;
+    }
+
+    while (value > 0U)
+    {
+        buffer[index++] =
+            (char)('0' + (value % 10U));
+
+        value /= 10U;
+    }
+
+    while (index > 0U)
+    {
+        char character[2];
+
+        character[0] = buffer[--index];
+        character[1] = '\0';
+
+        uart_write(character);
+    }
+}
+
+/*
+오류 발생 시 PB14 LED ON
+*/
+static void firmware_error(void)
 {
     __disable_irq();
-    failure_file = file;
-    failure_line = line;
-    GPIOB->BSRR = (1U << 14); /* LD3 빨강; 오류 처리 중 UART/heap 사용 금지 */
+
+    GPIOB->BSRR = (1U << 14);
+
     for (;;)
     {
         __NOP();
     }
 }
-void vApplicationMallocFailedHook(void) { firmware_assert(__FILE__, __LINE__); }
-void vApplicationStackOverflowHook(TaskHandle_t task, char *name)
-{
-    (void)task;
-    (void)name;
-    firmware_assert(__FILE__, __LINE__);
-}
 
+/*
+HSI 16MHz
+GPIOB LED
+USART3 초기화
+*/
 static void hardware_init(void)
 {
-    /* 1. RCC=0x40023800. 외부 크리스털/ST-LINK MCO에 의존하지 않는 HSI 16MHz.
-     * SYSCLK=HCLK=PCLK1=PCLK2=16MHz. scheduler 시작 후에는 클록 변경 금지.
-     */
+    /*
+    HSI 16MHz 설정
+    */
+
     RCC->CR |= RCC_CR_HSION;
+
     while ((RCC->CR & RCC_CR_HSIRDY) == 0U)
     {
     }
+
     RCC->CFGR &= ~RCC_CFGR_SW;
+
     while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_HSI)
     {
     }
-    RCC->CFGR &= ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2);
+
+    RCC->CFGR &= ~(
+        RCC_CFGR_HPRE |
+        RCC_CFGR_PPRE1 |
+        RCC_CFGR_PPRE2);
+
     SystemCoreClockUpdate();
-    SCB->VTOR = FLASH_BASE; /* 기존 startup 벡터: 0x08000000, bootloader 없음 */
+
+    SCB->VTOR = FLASH_BASE;
+
     __DSB();
     __ISB();
-    NVIC_SetPriorityGrouping(0U); /* 4비트 모두 선점 우선순위 */
 
-    /* 2. AHB1ENR(+0x30): GPIOB/C/D 클록, read-back으로 전파 대기.
-     * GPIOB=0x40020400: MODER(+0), OTYPER(+4), PUPDR(+0x0c),
-     * ODR(+0x14), BSRR(+0x18): 하위16 set / 상위16 reset.
-     */
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN | RCC_AHB1ENR_GPIODEN;
+    NVIC_SetPriorityGrouping(0U);
+
+    /*
+    GPIOB / GPIOD Clock Enable
+    */
+
+    RCC->AHB1ENR |=
+        RCC_AHB1ENR_GPIOBEN |
+        RCC_AHB1ENR_GPIODEN;
+
     (void)RCC->AHB1ENR;
-    GPIOB->BSRR = ((1U << 0) | (1U << 7) | (1U << 14)) << 16;
-    GPIOB->MODER = (GPIOB->MODER & ~((3U << 0) | (3U << 14) | (3U << 28))) | (1U << 0) |
-                   (1U << 14) | (1U << 28);
-    GPIOB->OTYPER &= ~((1U << 0) | (1U << 7) | (1U << 14));
-    GPIOB->PUPDR &= ~((3U << 0) | (3U << 14) | (3U << 28));
-    GPIOC->MODER &= ~(3U << 26); /* PC13 입력: 버튼 눌림=1 */
-    GPIOC->PUPDR = (GPIOC->PUPDR & ~(3U << 26)) | (2U << 26);
 
-    /* 3. PD8 TX, PD9 RX: MODER=10(AF), AFRH AF7, push-pull, RX pull-up. */
-    GPIOD->MODER = (GPIOD->MODER & ~((3U << 16) | (3U << 18))) | (2U << 16) | (2U << 18);
-    GPIOD->AFR[1] = (GPIOD->AFR[1] & ~0xffU) | 0x77U;
-    GPIOD->OTYPER &= ~((1U << 8) | (1U << 9));
-    GPIOD->OSPEEDR = (GPIOD->OSPEEDR & ~((3U << 16) | (3U << 18))) | (2U << 16) | (2U << 18);
-    GPIOD->PUPDR = (GPIOD->PUPDR & ~((3U << 16) | (3U << 18))) | (1U << 18);
+    /*
+    PB0 LED 출력
+    PB14 오류 LED 출력
+    */
+
+    GPIOB->BSRR =
+        ((1U << 0) | (1U << 14)) << 16;
+
+    GPIOB->MODER =
+        (GPIOB->MODER &
+         ~((3U << 0) | (3U << 28))) |
+        (1U << 0) |
+        (1U << 28);
+
+    GPIOB->OTYPER &=
+        ~((1U << 0) | (1U << 14));
+
+    GPIOB->PUPDR &=
+        ~((3U << 0) | (3U << 28));
+
+    /*
+    PD8 = TX
+    PD9 = RX
+    Alternate Function 7
+    */
+
+    GPIOD->MODER =
+        (GPIOD->MODER &
+         ~((3U << 16) | (3U << 18))) |
+        (2U << 16) |
+        (2U << 18);
+
+    GPIOD->AFR[1] =
+        (GPIOD->AFR[1] & ~0xFFU) |
+        0x77U;
+
+    GPIOD->OTYPER &=
+        ~((1U << 8) | (1U << 9));
+
+    GPIOD->PUPDR =
+        (GPIOD->PUPDR &
+         ~((3U << 16) | (3U << 18))) |
+        (1U << 18);
+
+    /*
+    USART3 115200, 8N1
+    */
+
     RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
+
     (void)RCC->APB1ENR;
+
     USART3->CR1 = 0U;
     USART3->CR2 = 0U;
     USART3->CR3 = 0U;
-    /* OVER8=0: BRR=round(PCLK1/115200)=139=0x008b.
-     * 실제 115107.9 baud(-0.08%, HSI 자체 오차 제외), 8 data/no parity/1 stop.
-     * RX는 활성화하지만 이 예제들은 송신만 사용한다(RXNE IRQ 없음).
-     */
-    USART3->BRR = (16000000U + 115200U / 2U) / 115200U;
-    USART3->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;
+
+    USART3->BRR =
+        (16000000U + 115200U / 2U) /
+        115200U;
+
+    USART3->CR1 =
+        USART_CR1_UE |
+        USART_CR1_TE |
+        USART_CR1_RE;
 }
 
-/* Chapter 6 — Example 18: Deferring interrupt work to the daemon task */
-/* configUSE_TIMERS=1: daemon 태스크가 deferred 함수를 처리한다. */
-static void deferred(void *arg, uint32_t value)
+/*
+교재 Listing 103
+
+Deferred Handling Function
+
+ISR에서 직접 실행하는 함수가 아니다.
+
+Timer Command Queue를 통해
+Daemon Task가 이 함수를 실행한다.
+
+pvParameter1 : 사용하지 않음
+ulParameter2 : 인터럽트 발생 번호
+*/
+static void vDeferredHandlingFunction(
+    void *pvParameter1,
+    uint32_t ulParameter2)
 {
-    (void)arg;
-    (void)value;
-    uart_write("Deferred processing in Timer Daemon Task\r\n");
+    (void)pvParameter1;
+
+    /*
+    Daemon Task 문맥에서 실행
+
+    Thread Mode
+    PSP 사용
+
+    별도 Handler Task 없이
+    인터럽트 후속 처리 수행
+    */
+
+    GPIOB->ODR ^= (1U << 0);
+
+    uart_write(
+        "Handler function - Processing event ");
+
+    uart_write_number(ulParameter2);
+
+    uart_write("\r\n");
 }
-void EXTI15_10_IRQHandler(void)
+
+/*
+교재 Listing 102
+
+Software Interrupt Handler
+
+ISR은 이벤트를 직접 처리하지 않고
+Timer Command Queue로 전달한다.
+*/
+void HASH_RNG_IRQHandler(void)
 {
-    if ((EXTI->PR & EXTI_PR_PR13) == 0U)
-        return;
-    EXTI->PR = EXTI_PR_PR13; /* 해당 라인만 W1C */
-    /* scheduler 전 버튼 입력은 버린다: 초기화 중 FromISR 호출 방지. */
-    if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING)
-        return;
-    BaseType_t woken = pdFALSE;
-    (void)xTimerPendFunctionCallFromISR(deferred, NULL, 0, &woken);
-    portYIELD_FROM_ISR(woken);
+    static uint32_t ulParameterValue = 0U;
+
+    BaseType_t xHigherPriorityTaskWoken =
+        pdFALSE;
+
+    /*
+    xTimerPendFunctionCallFromISR()
+
+    실행할 함수
+    vDeferredHandlingFunction
+
+    Parameter1 = NULL
+
+    Parameter2 = ulParameterValue
+
+    Timer Command Queue에
+    실행 요청을 저장한다.
+    */
+
+    BaseType_t result =
+        xTimerPendFunctionCallFromISR(
+            vDeferredHandlingFunction,
+            NULL,
+            ulParameterValue,
+            &xHigherPriorityTaskWoken);
+
+    /*
+    인터럽트 발생 번호 증가
+
+    교재와 동일하게
+    ISR 호출마다 1씩 증가한다.
+    */
+
+    ulParameterValue++;
+
+    /*
+    Timer Queue 전송에 실패하면
+    실패 횟수를 기록한다.
+    */
+
+    if (result != pdPASS)
+    {
+        deferredErrorCount++;
+    }
+
+    /*
+    Daemon Task가 높은 우선순위로
+    깨어났으면 PendSV 요청
+    */
+
+    portYIELD_FROM_ISR(
+        xHigherPriorityTaskWoken);
 }
+
+/*
+Periodic Task
+
+교재 Example 16과 동일한 구조
+
+500ms마다 소프트웨어 인터럽트 발생
+*/
+static void PeriodicTask(void *argument)
+{
+    const TickType_t delay500ms =
+        pdMS_TO_TICKS(500);
+
+    (void)argument;
+
+    for (;;)
+    {
+        /*
+        500ms 대기
+
+        RUNNING → BLOCKED
+
+        시간이 지나면
+        BLOCKED → READY
+        */
+
+        vTaskDelay(delay500ms);
+
+        /*
+        소프트웨어 인터럽트 발생 직전
+        */
+
+        uart_write(
+            "Periodic task - About to generate an interrupt.\r\n");
+
+        /*
+        NVIC Pending Bit 설정
+
+        HASH_RNG_IRQHandler 실행
+        */
+
+        NVIC_SetPendingIRQ(HASH_RNG_IRQn);
+
+        /*
+        Daemon Task Priority = 4
+
+        Periodic Task Priority = 3
+
+        Daemon Task가 먼저 실행되면
+        Deferred 메시지가 먼저 출력된다.
+        */
+
+        uart_write(
+            "Periodic task - Interrupt generated.\r\n\r\n");
+    }
+}
+
+/*
+main
+
+하드웨어 초기화
+Task 생성
+IRQ 설정
+Scheduler 시작
+*/
 int main(void)
 {
-    hardware_init(); /* 별도 worker는 필요하지 않다. */
-    /* SYSCFG=0x40013800, EXTICR4(+0x14)[7:4]=2: EXTI13 <- PC13.
-     * EXTI=0x40013c00, PR(+0x14)은 write-one-to-clear, |= 사용 금지.
-     */
-    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-    (void)RCC->APB2ENR;
-    SYSCFG->EXTICR[3] = (SYSCFG->EXTICR[3] & ~(15U << 4)) | (2U << 4);
-    EXTI->IMR &= ~EXTI_IMR_MR13;
-    EXTI->RTSR |= EXTI_RTSR_TR13;
-    EXTI->FTSR &= ~EXTI_FTSR_TR13;
-    EXTI->PR = EXTI_PR_PR13;
-    NVIC_ClearPendingIRQ(EXTI15_10_IRQn);
-    /* 숫자가 작을수록 높은 IRQ 우선순위. FromISR 허용 범위=5..15, 여기서는 6. */
-    NVIC_SetPriority(EXTI15_10_IRQn, 6U);
-    EXTI->IMR |= EXTI_IMR_MR13;
-    NVIC_EnableIRQ(EXTI15_10_IRQn);
+    hardware_init();
 
-    /* 마지막 단계: 포트가 SVC로 첫 태스크를 시작하고 SysTick/PendSV를 관리한다. */
+    /*
+    교재 Example 18에서는
+    Semaphore를 생성하지 않는다.
+
+    별도의 Handler Task도 생성하지 않는다.
+
+    Daemon Task는 FreeRTOS가
+    Scheduler 시작 과정에서 생성한다.
+    */
+
+    /*
+    ① Periodic Task 생성
+
+    Priority = 3
+    Stack = 512 words
+    */
+
+    if (xTaskCreate(
+            PeriodicTask,
+            "Periodic",
+            512,
+            NULL,
+            3,
+            NULL) != pdPASS)
+    {
+        firmware_error();
+    }
+
+    /*
+    ② 소프트웨어 인터럽트 설정
+
+    IRQ Priority = 6
+
+    FreeRTOS FromISR API 호출 가능
+    우선순위 범위에 속해야 한다.
+    */
+
+    NVIC_DisableIRQ(HASH_RNG_IRQn);
+
+    NVIC_ClearPendingIRQ(HASH_RNG_IRQn);
+
+    NVIC_SetPriority(
+        HASH_RNG_IRQn,
+        6U);
+
+    NVIC_EnableIRQ(HASH_RNG_IRQn);
+
+    /*
+    ③ FreeRTOS Scheduler 시작
+
+    FreeRTOS 내부에서
+
+    Idle Task 생성
+    Timer Daemon Task 생성
+    Timer Command Queue 사용
+
+    Daemon Task Priority = 4
+
+    Timer Queue에 실행 요청이 없으면
+    Daemon Task는 BLOCKED
+    */
+
     vTaskStartScheduler();
-    firmware_assert(__FILE__, __LINE__); /* heap 부족 등 scheduler 반환은 오류 */
+
+    /*
+    Scheduler 시작 실패 시 실행
+    */
+
+    firmware_error();
+
     return 0;
 }

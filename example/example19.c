@@ -1,174 +1,638 @@
-/* NUCLEO-F429ZI / STM32F429xx / FreeRTOS Native API
- * 독립 실행: 이 파일 하나를 main.c로 사용한다. 다른 exampleXX.c와 동시 링크 금지.
- * 태스크 stack=512 words(2048 bytes), priority는 각 xTaskCreate 인수 참조.
- * 1. receiver(3)가 빈 큐에서 Blocked가 된다.
- * 2. IRQ가 값13을 복사하여 송신한다. FromISR→Ready→PendSV→receiver 순서이다.
- * 공통 실행 조건: preemption=1, time slicing=1, tick=1ms.
- * 같은 priority의 Ready 태스크는 tick마다 교대 가능, Blocked 태스크는 대상에서 제외.
- */
+
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
-#include "semphr.h"
 #include "timers.h"
-#include "event_groups.h"
 #include "stm32f4xx.h"
 #include <stdint.h>
-#include <stdio.h>
 
-/* 이 파일 안에서만 쓰는 UART 출력: 별도 BSP/표준 입출력 retarget 불필요.
- * USART3=0x40004800, SR(+0x00)의 TXE(bit7), DR(+0x04).
- * TXE 검사와 DR 기록만 critical section으로 보호한다. 대기는 밖에서 한다.
- * 메시지 전체를 잠그지 않으므로 태스크 간 문자열은 섞일 수 있다.
- * Example20은 mutex, Example21은 gatekeeper로 메시지 단위 보호를 학습한다.
- * ISR에서는 호출 금지. Timer callback의 폴링 시간만큼 daemon 처리가 늦어진다.
- */
+/*
+STM32F429ZI - FreeRTOS Chapter 6 Example 19
+
+Sending and Receiving on a Queue
+From Within an Interrupt
+
+USART3 : PD8 TX / PD9 RX
+Baud   : 115200
+LED    : PB0
+
+Integer Generator Task : Priority 1
+String Printer Task    : Priority 2
+
+Integer Queue : 10 x uint32_t
+String Queue  : 10 x char *
+
+200ms마다 Integer Generator가 정수 5개 전송
+
+ISR에서 정수 5개 수신
+하위 2비트로 문자열 선택
+String Queue에 문자열 포인터 전송
+
+Printer Task에서 문자열 출력
+
+소프트웨어 IRQ : HASH_RNG_IRQn
+*/
+
+static QueueHandle_t xIntegerQueue = NULL;
+static QueueHandle_t xStringQueue = NULL;
+
+static volatile uint32_t queueErrorCount = 0;
+
+
+/*
+기존 FreeRTOSConfig.h에서
+Trace Hook이 활성화된 경우 사용
+*/
+void Trace_OnSwitchIn(void *tcb)
+{
+    (void)tcb;
+}
+
+
+/*
+configUSE_TIMERS가 활성화되고
+Static Allocation을 사용하는 경우
+
+Timer Daemon Task 메모리 제공
+*/
+#if (configUSE_TIMERS == 1) && \
+    (configSUPPORT_STATIC_ALLOCATION == 1)
+
+void vApplicationGetTimerTaskMemory(
+    StaticTask_t **ppxTimerTaskTCBBuffer,
+    StackType_t **ppxTimerTaskStackBuffer,
+    uint32_t *pulTimerTaskStackSize)
+{
+    static StaticTask_t timerTaskTCB;
+
+    static StackType_t timerTaskStack[
+        configTIMER_TASK_STACK_DEPTH
+    ];
+
+    *ppxTimerTaskTCBBuffer = &timerTaskTCB;
+
+    *ppxTimerTaskStackBuffer = timerTaskStack;
+
+    *pulTimerTaskStackSize =
+        configTIMER_TASK_STACK_DEPTH;
+}
+
+#endif
+
+
+/*
+UART 문자열 출력
+
+TXE가 1이면 DR에 데이터 기록
+ISR에서는 사용하지 않는다.
+*/
 static void uart_write(const char *text)
 {
     while (*text != '\0')
     {
+        while ((USART3->SR & USART_SR_TXE) == 0U)
+        {
+        }
+
         taskENTER_CRITICAL();
+
         if ((USART3->SR & USART_SR_TXE) != 0U)
         {
             USART3->DR = (uint8_t)*text++;
         }
+
         taskEXIT_CRITICAL();
     }
 }
 
-/* assert 식은 검사만 수행한다. 실패 위치는 debugger에서 확인한다. */
-volatile const char *failure_file;
-volatile int failure_line;
-void firmware_assert(const char *file, int line)
+
+/*
+오류 발생 시 PB14 LED ON
+*/
+static void firmware_error(void)
 {
     __disable_irq();
-    failure_file = file;
-    failure_line = line;
-    GPIOB->BSRR = (1U << 14); /* LD3 빨강; 오류 처리 중 UART/heap 사용 금지 */
+
+    GPIOB->BSRR = (1U << 14);
+
     for (;;)
     {
         __NOP();
     }
 }
-void vApplicationMallocFailedHook(void) { firmware_assert(__FILE__, __LINE__); }
-void vApplicationStackOverflowHook(TaskHandle_t task, char *name)
-{
-    (void)task;
-    (void)name;
-    firmware_assert(__FILE__, __LINE__);
-}
 
+
+/*
+HSI 16MHz
+GPIOB LED
+USART3 초기화
+*/
 static void hardware_init(void)
 {
-    /* 1. RCC=0x40023800. 외부 크리스털/ST-LINK MCO에 의존하지 않는 HSI 16MHz.
-     * SYSCLK=HCLK=PCLK1=PCLK2=16MHz. scheduler 시작 후에는 클록 변경 금지.
-     */
+    /*
+    HSI 16MHz 설정
+    */
+
     RCC->CR |= RCC_CR_HSION;
+
     while ((RCC->CR & RCC_CR_HSIRDY) == 0U)
     {
     }
+
     RCC->CFGR &= ~RCC_CFGR_SW;
-    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_HSI)
+
+    while ((RCC->CFGR & RCC_CFGR_SWS)
+           != RCC_CFGR_SWS_HSI)
     {
     }
-    RCC->CFGR &= ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2);
+
+    RCC->CFGR &= ~(
+        RCC_CFGR_HPRE |
+        RCC_CFGR_PPRE1 |
+        RCC_CFGR_PPRE2
+    );
+
     SystemCoreClockUpdate();
-    SCB->VTOR = FLASH_BASE; /* 기존 startup 벡터: 0x08000000, bootloader 없음 */
+
+    SCB->VTOR = FLASH_BASE;
+
     __DSB();
     __ISB();
-    NVIC_SetPriorityGrouping(0U); /* 4비트 모두 선점 우선순위 */
 
-    /* 2. AHB1ENR(+0x30): GPIOB/C/D 클록, read-back으로 전파 대기.
-     * GPIOB=0x40020400: MODER(+0), OTYPER(+4), PUPDR(+0x0c),
-     * ODR(+0x14), BSRR(+0x18): 하위16 set / 상위16 reset.
-     */
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN | RCC_AHB1ENR_GPIODEN;
+    NVIC_SetPriorityGrouping(0U);
+
+
+    /*
+    GPIOB / GPIOD Clock Enable
+    */
+
+    RCC->AHB1ENR |=
+        RCC_AHB1ENR_GPIOBEN |
+        RCC_AHB1ENR_GPIODEN;
+
     (void)RCC->AHB1ENR;
-    GPIOB->BSRR = ((1U << 0) | (1U << 7) | (1U << 14)) << 16;
-    GPIOB->MODER = (GPIOB->MODER & ~((3U << 0) | (3U << 14) | (3U << 28))) | (1U << 0) |
-                   (1U << 14) | (1U << 28);
-    GPIOB->OTYPER &= ~((1U << 0) | (1U << 7) | (1U << 14));
-    GPIOB->PUPDR &= ~((3U << 0) | (3U << 14) | (3U << 28));
-    GPIOC->MODER &= ~(3U << 26); /* PC13 입력: 버튼 눌림=1 */
-    GPIOC->PUPDR = (GPIOC->PUPDR & ~(3U << 26)) | (2U << 26);
 
-    /* 3. PD8 TX, PD9 RX: MODER=10(AF), AFRH AF7, push-pull, RX pull-up. */
-    GPIOD->MODER = (GPIOD->MODER & ~((3U << 16) | (3U << 18))) | (2U << 16) | (2U << 18);
-    GPIOD->AFR[1] = (GPIOD->AFR[1] & ~0xffU) | 0x77U;
-    GPIOD->OTYPER &= ~((1U << 8) | (1U << 9));
-    GPIOD->OSPEEDR = (GPIOD->OSPEEDR & ~((3U << 16) | (3U << 18))) | (2U << 16) | (2U << 18);
-    GPIOD->PUPDR = (GPIOD->PUPDR & ~((3U << 16) | (3U << 18))) | (1U << 18);
+
+    /*
+    PB0 LED
+    PB14 Error LED
+    */
+
+    GPIOB->BSRR =
+        ((1U << 0) | (1U << 14)) << 16;
+
+    GPIOB->MODER =
+        (GPIOB->MODER &
+         ~((3U << 0) | (3U << 28))) |
+        (1U << 0) |
+        (1U << 28);
+
+    GPIOB->OTYPER &=
+        ~((1U << 0) | (1U << 14));
+
+    GPIOB->PUPDR &=
+        ~((3U << 0) | (3U << 28));
+
+
+    /*
+    USART3 GPIO
+
+    PD8 TX
+    PD9 RX
+
+    AF7
+    */
+
+    GPIOD->MODER =
+        (GPIOD->MODER &
+         ~((3U << 16) | (3U << 18))) |
+        (2U << 16) |
+        (2U << 18);
+
+    GPIOD->AFR[1] =
+        (GPIOD->AFR[1] & ~0xFFU) |
+        0x77U;
+
+    GPIOD->OTYPER &=
+        ~((1U << 8) | (1U << 9));
+
+    GPIOD->PUPDR =
+        (GPIOD->PUPDR &
+         ~((3U << 16) | (3U << 18))) |
+        (1U << 18);
+
+
+    /*
+    USART3 115200 8N1
+    */
+
     RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
+
     (void)RCC->APB1ENR;
+
     USART3->CR1 = 0U;
     USART3->CR2 = 0U;
     USART3->CR3 = 0U;
-    /* OVER8=0: BRR=round(PCLK1/115200)=139=0x008b.
-     * 실제 115107.9 baud(-0.08%, HSI 자체 오차 제외), 8 data/no parity/1 stop.
-     * RX는 활성화하지만 이 예제들은 송신만 사용한다(RXNE IRQ 없음).
-     */
-    USART3->BRR = (16000000U + 115200U / 2U) / 115200U;
-    USART3->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;
+
+    USART3->BRR =
+        (16000000U + 115200U / 2U) /
+        115200U;
+
+    USART3->CR1 =
+        USART_CR1_UE |
+        USART_CR1_TE |
+        USART_CR1_RE;
 }
 
-/* Chapter 6 — Example 19: Sending and receiving a queue item from ISR */
-static QueueHandle_t q;
-static void receiver(void *arg)
+
+/*
+교재 Listing 107
+
+Integer Generator Task
+
+Priority = 1
+
+200ms마다 정수 5개를 생성해
+Integer Queue에 전송
+
+이후 Software IRQ 발생
+*/
+static void vIntegerGenerator(void *argument)
 {
-    (void)arg;
-    uint32_t event;
+    TickType_t xLastExecutionTime;
+
+    uint32_t ulValueToSend = 0U;
+
+    (void)argument;
+
+
+    /*
+    주기 실행 기준 Tick 설정
+    */
+
+    xLastExecutionTime = xTaskGetTickCount();
+
+
     for (;;)
     {
-        if (xQueueReceive(q, &event, portMAX_DELAY) == pdPASS)
+        /*
+        200ms 주기 대기
+
+        RUNNING → BLOCKED
+
+        Tick 경과 후
+        BLOCKED → READY
+        */
+
+        vTaskDelayUntil(
+            &xLastExecutionTime,
+            pdMS_TO_TICKS(200)
+        );
+
+
+        /*
+        Integer Queue에
+        정수 5개 전송
+
+        첫 번째 반복
+
+        0, 1, 2, 3, 4
+
+        두 번째 반복
+
+        5, 6, 7, 8, 9
+        */
+
+        for (uint32_t i = 0U; i < 5U; i++)
         {
-            char line[55];
-            (void)snprintf(line, sizeof line, "IRQ event=%lu\r\n", (unsigned long)event);
-            uart_write(line);
+            if (xQueueSendToBack(
+                    xIntegerQueue,
+                    &ulValueToSend,
+                    0) != pdPASS)
+            {
+                queueErrorCount++;
+                firmware_error();
+            }
+
+            ulValueToSend++;
+        }
+
+
+        /*
+        소프트웨어 인터럽트 발생 직전
+        */
+
+        uart_write(
+            "Generator task - About to generate an interrupt.\r\n"
+        );
+
+
+        /*
+        NVIC Pending 설정
+
+        HASH_RNG_IRQHandler 실행
+        */
+
+        NVIC_SetPendingIRQ(HASH_RNG_IRQn);
+
+
+        /*
+        String Printer Priority = 2
+
+        Integer Generator Priority = 1
+
+        ISR 종료 후 Printer Task가
+        먼저 실행되는 것이 정상적인 흐름
+        */
+
+        uart_write(
+            "Generator task - Interrupt generated.\r\n\r\n"
+        );
+    }
+}
+
+
+/*
+교재 Listing 108
+
+Software Interrupt Handler
+
+ISR에서 두 종류의 Queue API 사용
+
+① xQueueReceiveFromISR()
+② xQueueSendToBackFromISR()
+*/
+void HASH_RNG_IRQHandler(void)
+{
+    BaseType_t xHigherPriorityTaskWoken =
+        pdFALSE;
+
+    uint32_t ulReceivedNumber;
+
+
+    /*
+    교재의 문자열 배열
+
+    정수의 하위 2비트를 사용하여
+    문자열 인덱스를 결정한다.
+    */
+
+    static const char *pcStrings[] =
+    {
+        "String 0\r\n",
+        "String 1\r\n",
+        "String 2\r\n",
+        "String 3\r\n"
+    };
+
+
+    /*
+    Integer Queue가 비워질 때까지
+    정수를 반복 수신
+
+    ISR은 Blocked 상태가 될 수 없다.
+    */
+
+    while (xQueueReceiveFromISR(
+               xIntegerQueue,
+               &ulReceivedNumber,
+               &xHigherPriorityTaskWoken) == pdPASS)
+    {
+        /*
+        하위 2비트만 추출
+
+        0x03 = 0000 0011
+
+        정수 0 → 0
+        정수 1 → 1
+        정수 2 → 2
+        정수 3 → 3
+        정수 4 → 0
+        */
+
+        ulReceivedNumber &= 0x03U;
+
+
+        /*
+        해당 문자열 포인터를
+        String Queue에 전송
+
+        문자열 본문이 아니라
+        포인터 값을 Queue에 복사한다.
+        */
+
+        const char *pcString =
+            pcStrings[ulReceivedNumber];
+
+        if (xQueueSendToBackFromISR(
+                xStringQueue,
+                &pcString,
+                &xHigherPriorityTaskWoken) != pdPASS)
+        {
+            queueErrorCount++;
+        }
+    }
+
+
+    /*
+    ISR에서 Queue 송신으로
+    Printer Task가 깨어날 수 있다.
+
+    Printer Task
+    BLOCKED → READY
+
+    더 높은 Priority라면
+    PendSV Context Switching 요청
+    */
+
+    portYIELD_FROM_ISR(
+        xHigherPriorityTaskWoken
+    );
+}
+
+
+/*
+교재 Listing 109
+
+String Printer Task
+
+Priority = 2
+
+String Queue에서 문자열 포인터 수신
+*/
+static void vStringPrinter(void *argument)
+{
+    const char *pcString = NULL;
+
+    (void)argument;
+
+
+    for (;;)
+    {
+        /*
+        String Queue가 비어 있으면
+
+        Printer Task
+        RUNNING → BLOCKED
+
+        ISR에서 문자열 포인터가 도착하면
+
+        BLOCKED → READY
+        */
+
+        if (xQueueReceive(
+                xStringQueue,
+                &pcString,
+                portMAX_DELAY) == pdPASS)
+        {
+            /*
+            Queue에서 수신한
+            문자열을 UART로 출력
+
+            이 코드는 ISR이 아니라
+            Printer Task에서 실행된다.
+            */
+
+            uart_write(pcString);
+
+            GPIOB->ODR ^= (1U << 0);
         }
     }
 }
-void EXTI15_10_IRQHandler(void)
-{
-    if ((EXTI->PR & EXTI_PR_PR13) == 0U)
-        return;
-    EXTI->PR = EXTI_PR_PR13; /* 해당 라인만 W1C */
-    /* scheduler 전 버튼 입력은 버린다: 초기화 중 FromISR 호출 방지. */
-    if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING)
-        return;
-    BaseType_t woken = pdFALSE;
-    uint32_t event = 13;
-    if (q)
-        (void)xQueueSendFromISR(q, &event, &woken);
-    portYIELD_FROM_ISR(woken);
-}
+
+
+/*
+교재 Listing 110
+
+main
+
+Queue 2개 생성
+Task 2개 생성
+소프트웨어 인터럽트 설정
+Scheduler 시작
+*/
 int main(void)
 {
     hardware_init();
-    q = xQueueCreate(8, sizeof(uint32_t));
-    configASSERT(q);
-    {
-        BaseType_t result0 = xTaskCreate(receiver, "receiver", 512, NULL, 3, NULL);
-        if (result0 != pdPASS)
-            firmware_assert(__FILE__, __LINE__);
-    }
-    /* SYSCFG=0x40013800, EXTICR4(+0x14)[7:4]=2: EXTI13 <- PC13.
-     * EXTI=0x40013c00, PR(+0x14)은 write-one-to-clear, |= 사용 금지.
-     */
-    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-    (void)RCC->APB2ENR;
-    SYSCFG->EXTICR[3] = (SYSCFG->EXTICR[3] & ~(15U << 4)) | (2U << 4);
-    EXTI->IMR &= ~EXTI_IMR_MR13;
-    EXTI->RTSR |= EXTI_RTSR_TR13;
-    EXTI->FTSR &= ~EXTI_FTSR_TR13;
-    EXTI->PR = EXTI_PR_PR13;
-    NVIC_ClearPendingIRQ(EXTI15_10_IRQn);
-    /* 숫자가 작을수록 높은 IRQ 우선순위. FromISR 허용 범위=5..15, 여기서는 6. */
-    NVIC_SetPriority(EXTI15_10_IRQn, 6U);
-    EXTI->IMR |= EXTI_IMR_MR13;
-    NVIC_EnableIRQ(EXTI15_10_IRQn);
 
-    /* 마지막 단계: 포트가 SVC로 첫 태스크를 시작하고 SysTick/PendSV를 관리한다. */
+
+    /*
+    ① Integer Queue 생성
+
+    최대 10개
+
+    각 항목 = uint32_t
+    */
+
+    xIntegerQueue =
+        xQueueCreate(
+            10,
+            sizeof(uint32_t)
+        );
+
+    if (xIntegerQueue == NULL)
+    {
+        firmware_error();
+    }
+
+
+    /*
+    ② String Queue 생성
+
+    최대 10개
+
+    각 항목 = char *
+    */
+
+    xStringQueue =
+        xQueueCreate(
+            10,
+            sizeof(const char *)
+        );
+
+    if (xStringQueue == NULL)
+    {
+        firmware_error();
+    }
+
+
+    /*
+    ③ Integer Generator Task 생성
+
+    Priority = 1
+    Stack = 512 words
+    */
+
+    if (xTaskCreate(
+            vIntegerGenerator,
+            "IntGen",
+            512,
+            NULL,
+            1,
+            NULL) != pdPASS)
+    {
+        firmware_error();
+    }
+
+
+    /*
+    ④ String Printer Task 생성
+
+    Priority = 2
+    Stack = 512 words
+    */
+
+    if (xTaskCreate(
+            vStringPrinter,
+            "String",
+            512,
+            NULL,
+            2,
+            NULL) != pdPASS)
+    {
+        firmware_error();
+    }
+
+
+    /*
+    ⑤ 소프트웨어 인터럽트 설정
+
+    HASH_RNG_IRQn
+
+    NVIC Priority = 6
+    */
+
+    NVIC_DisableIRQ(HASH_RNG_IRQn);
+
+    NVIC_ClearPendingIRQ(HASH_RNG_IRQn);
+
+    NVIC_SetPriority(
+        HASH_RNG_IRQn,
+        6U
+    );
+
+    NVIC_EnableIRQ(HASH_RNG_IRQn);
+
+
+    /*
+    ⑥ Scheduler 시작
+
+    Printer Task 먼저 실행
+
+    String Queue Empty
+
+    Printer Task → BLOCKED
+
+    Generator Task 실행 후
+    200ms 대기
+
+    이후 인터럽트 처리 반복
+    */
+
     vTaskStartScheduler();
-    firmware_assert(__FILE__, __LINE__); /* heap 부족 등 scheduler 반환은 오류 */
+
+
+    firmware_error();
+
     return 0;
 }
